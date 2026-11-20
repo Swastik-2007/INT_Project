@@ -1,0 +1,238 @@
+/* LPU Wayfinder - Global Design System */
+@import 'leaflet/dist/leaflet.css';
+
+:root {
+  --primary: #E66A27;
+  --primary-hover: #D05615;
+  --primary-light: #FFF2E8;
+  --primary-subtle: rgba(230, 106, 39, 0.08);
+
+  --dark: #20252D;
+  --dark-surface: #181C22;
+  --dark-card: #2B313A;
+
+  --cream: #FFF8F1;
+  --white: #FFFFFF;
+  --bg-page: #FAF8F5;
+
+  --gray-50: #F9FAFB;
+  --gray-100: #F3F4F6;
+  --gray-200: #E5E7EB;
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111827;
+
+  --success: #10B981;
+  --success-light: #ECFDF5;
+  --warning: #F59E0B;
+  --warning-light: #FEF3C7;
+  --danger: #EF4444;
+  --danger-light: #FEE2E2;
+  --info: #3B82F6;
+  --info-light: #EFF6FF;
+
+  --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-floating: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  font-family: var(--font-main);
+  background-color: var(--bg-page);
+  color: var(--dark);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
+
+/* Buttons */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Form inputs */
+input, select, textarea {
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--dark);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(230, 106, 39, 0.18) !important;
+}
+
+/* Leaflet map customizations */
+.leaflet-container {
+  font-family: var(--font-main) !important;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: var(--shadow-lg) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+  background-color: var(--white) !important;
+  color: var(--dark) !important;
+  width: 38px !important;
+  height: 38px !important;
+  line-height: 38px !important;
+  font-weight: 700;
+  border-bottom: 1px solid var(--gray-100) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: var(--gray-50) !important;
+  color: var(--primary) !important;
+}
+
+/* Pulsing User GPS Marker */
+.user-gps-marker {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  background-color: #2563EB;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.6);
+}
+
+.user-gps-marker::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: -9px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-color: rgba(37, 99, 235, 0.25);
+  animation: gps-pulse 2s infinite ease-out;
+}
+
+@keyframes gps-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* Campus Location Marker */
+.campus-marker-pin {
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--primary);
+  position: absolute;
+  transform: rotate(-45deg);
+  left: 50%;
+  top: 50%;
+  margin: -16px 0 0 -16px;
+  box-shadow: 0 4px 10px rgba(230, 106, 39, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.campus-marker-pin::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  margin: 9px 0 0 9px;
+  background: #fff;
+  position: absolute;
+  border-radius: 50%;
+}
+
+.campus-marker-unverified {
+  background: var(--gray-500) !important;
+  box-shadow: 0 4px 10px rgba(107, 114, 128, 0.3) !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

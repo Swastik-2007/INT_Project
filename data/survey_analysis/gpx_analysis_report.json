@@ -1,0 +1,309 @@
+{
+  "generated_at": "2026-11-20T08:01:01.741419Z",
+  "source_files": [
+    "Main_gate to Admission & class area.gpx",
+    "Block 30 to 32.gpx",
+    "Block 32 to 34.gpx",
+    "Block 34 to BH4.gpx"
+  ],
+  "source_directory": "C:\\Users\\swast\\OneDrive\\Desktop\\INT_PROJECT\\data\\raw_surveys",
+  "segment_labels": [
+    "A: Main Gate \u2192 Admission/Academic Area",
+    "B: Block 30 Area \u2192 Block 32",
+    "C: Block 32 \u2192 Block 34 (Outdoor)",
+    "D: Block 34 \u2192 BH4 (Boys Hostel 4)"
+  ],
+  "tracks": [
+    {
+      "filename": "Main_gate to Admission & class area.gpx",
+      "metadata_name": "2026-11-20_12-07_Fri",
+      "creator": "OsmAnd 5.4.11",
+      "file_hash": "b63899abdcde4a1373cd6ec38c98b2b026bc326b83eac77d5f000e6f9083c934",
+      "point_count": 138,
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bbox": {
+        "min_lat": 31.2531338,
+        "max_lat": 31.2602362,
+        "min_lon": 75.7044727,
+        "max_lon": 75.7072594
+      },
+      "start": {
+        "lat": 31.2602362,
+        "lon": 75.7069027,
+        "time": "2026-11-20T06:37:11Z"
+      },
+      "end": {
+        "lat": 31.2531338,
+        "lon": 75.7047218,
+        "time": "2026-11-20T06:49:11Z"
+      },
+      "has_timestamps": true,
+      "start_time": "2026-11-20 06:37:11+00:00",
+      "end_time": "2026-11-20 06:49:11+00:00",
+      "duration_seconds": 720.0,
+      "timestamps_ordered": true,
+      "hdop_stats": {
+        "min": 3.0,
+        "max": 9.3,
+        "mean": 4.46,
+        "points_with_hdop": 138,
+        "points_hdop_gt_10": 0
+      },
+      "speed_stats_ms": {
+        "min": 0.8,
+        "max": 1.5,
+        "mean": 1.16,
+        "points_with_speed": 138
+      },
+      "elevation_stats": {
+        "min": 232.8,
+        "max": 281.7,
+        "range": 48.9
+      },
+      "total_distance_m": 910.87,
+      "total_distance_km": 0.9109,
+      "max_point_to_point_jump_m": 9.67,
+      "max_jump_index": 74,
+      "duplicate_consecutive_points": 0,
+      "straight_line_distance_m": 816.51,
+      "bearing_start_to_end_deg": 194.7,
+      "unrealistic_jumps": [],
+      "avg_recording_interval_sec": 5.26
+    },
+    {
+      "filename": "Block 30 to 32.gpx",
+      "metadata_name": "2026-11-20_12-19_Fri",
+      "creator": "OsmAnd 5.4.11",
+      "file_hash": "ee2ad9ec000f0db624cb9b6d9e529f036f4e50c548af58f3f84f610daa011502",
+      "point_count": 13,
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bbox": {
+        "min_lat": 31.2524186,
+        "max_lat": 31.2529843,
+        "min_lon": 75.7048714,
+        "max_lon": 75.7051125
+      },
+      "start": {
+        "lat": 31.2529843,
+        "lon": 75.7048714,
+        "time": "2026-11-20T06:49:32Z"
+      },
+      "end": {
+        "lat": 31.2524186,
+        "lon": 75.70508,
+        "time": "2026-11-20T06:50:35Z"
+      },
+      "has_timestamps": true,
+      "start_time": "2026-11-20 06:49:32+00:00",
+      "end_time": "2026-11-20 06:50:35+00:00",
+      "duration_seconds": 63.0,
+      "timestamps_ordered": true,
+      "hdop_stats": {
+        "min": 3.6,
+        "max": 6.4,
+        "mean": 4.98,
+        "points_with_hdop": 13,
+        "points_hdop_gt_10": 0
+      },
+      "speed_stats_ms": {
+        "min": 1.0,
+        "max": 1.5,
+        "mean": 1.19,
+        "points_with_speed": 13
+      },
+      "elevation_stats": {
+        "min": 232.5,
+        "max": 264.4,
+        "range": 31.9
+      },
+      "total_distance_m": 78.11,
+      "total_distance_km": 0.0781,
+      "max_point_to_point_jump_m": 8.47,
+      "max_jump_index": 12,
+      "duplicate_consecutive_points": 0,
+      "straight_line_distance_m": 65.95,
+      "bearing_start_to_end_deg": 162.5,
+      "unrealistic_jumps": [],
+      "avg_recording_interval_sec": 5.25
+    },
+    {
+      "filename": "Block 32 to 34.gpx",
+      "metadata_name": "2026-11-20_12-20_Fri",
+      "creator": "OsmAnd 5.4.11",
+      "file_hash": "ac6374c353478251b9d4e1901c4edb01ffb910d84d8f22ca13abc34a398dc557",
+      "point_count": 14,
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bbox": {
+        "min_lat": 31.2515096,
+        "max_lat": 31.2523447,
+        "min_lon": 75.7050295,
+        "max_lon": 75.7050989
+      },
+      "start": {
+        "lat": 31.2523447,
+        "lon": 75.7050889,
+        "time": "2026-11-20T06:50:44Z"
+      },
+      "end": {
+        "lat": 31.2515096,
+        "lon": 75.7050747,
+        "time": "2026-11-20T06:51:55Z"
+      },
+      "has_timestamps": true,
+      "start_time": "2026-11-20 06:50:44+00:00",
+      "end_time": "2026-11-20 06:51:55+00:00",
+      "duration_seconds": 71.0,
+      "timestamps_ordered": true,
+      "hdop_stats": {
+        "min": 5.2,
+        "max": 9.4,
+        "mean": 6.76,
+        "points_with_hdop": 14,
+        "points_hdop_gt_10": 0
+      },
+      "speed_stats_ms": {
+        "min": 0.7,
+        "max": 1.4,
+        "mean": 1.14,
+        "points_with_speed": 14
+      },
+      "elevation_stats": {
+        "min": 256.9,
+        "max": 266.3,
+        "range": 9.4
+      },
+      "total_distance_m": 94.31,
+      "total_distance_km": 0.0943,
+      "max_point_to_point_jump_m": 8.7,
+      "max_jump_index": 7,
+      "duplicate_consecutive_points": 0,
+      "straight_line_distance_m": 92.87,
+      "bearing_start_to_end_deg": 180.8,
+      "unrealistic_jumps": [],
+      "avg_recording_interval_sec": 5.46
+    },
+    {
+      "filename": "Block 34 to BH4.gpx",
+      "metadata_name": "2026-11-20_12-23_Fri",
+      "creator": "OsmAnd 5.4.11",
+      "file_hash": "572b0d5d93562ec3e977a6c2e2ed253f5b33cef4d2807ddf4600b609baa5e78e",
+      "point_count": 98,
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bbox": {
+        "min_lat": 31.248915,
+        "max_lat": 31.2515297,
+        "min_lon": 75.6995916,
+        "max_lon": 75.7044087
+      },
+      "start": {
+        "lat": 31.2515297,
+        "lon": 75.7043005,
+        "time": "2026-11-20T06:53:45Z"
+      },
+      "end": {
+        "lat": 31.248915,
+        "lon": 75.6995916,
+        "time": "2026-11-20T07:02:19Z"
+      },
+      "has_timestamps": true,
+      "start_time": "2026-11-20 06:53:45+00:00",
+      "end_time": "2026-11-20 07:02:19+00:00",
+      "duration_seconds": 514.0,
+      "timestamps_ordered": true,
+      "hdop_stats": {
+        "min": 3.0,
+        "max": 7.9,
+        "mean": 5.41,
+        "points_with_hdop": 98,
+        "points_hdop_gt_10": 0
+      },
+      "speed_stats_ms": {
+        "min": 0.5,
+        "max": 1.4,
+        "mean": 1.19,
+        "points_with_speed": 98
+      },
+      "elevation_stats": {
+        "min": 229.4,
+        "max": 276.1,
+        "range": 46.7
+      },
+      "total_distance_m": 650.74,
+      "total_distance_km": 0.6507,
+      "max_point_to_point_jump_m": 10.98,
+      "max_jump_index": 5,
+      "duplicate_consecutive_points": 0,
+      "straight_line_distance_m": 533.77,
+      "bearing_start_to_end_deg": 237.0,
+      "unrealistic_jumps": [],
+      "avg_recording_interval_sec": 5.3
+    }
+  ],
+  "gaps": [
+    {
+      "from_recording": "Main_gate to Admission & class area.gpx",
+      "to_recording": "Block 30 to 32.gpx",
+      "gap_distance_m": 21.88,
+      "gap_bearing_deg": 139.5,
+      "time_gap_sec": 21.0,
+      "from_endpoint": {
+        "lat": 31.2531338,
+        "lon": 75.7047218
+      },
+      "to_startpoint": {
+        "lat": 31.2529843,
+        "lon": 75.7048714
+      },
+      "note": "Recording was stopped and restarted; physical path was not GPS-recorded during this gap."
+    },
+    {
+      "from_recording": "Block 30 to 32.gpx",
+      "to_recording": "Block 32 to 34.gpx",
+      "gap_distance_m": 8.26,
+      "gap_bearing_deg": 174.1,
+      "time_gap_sec": 9.0,
+      "from_endpoint": {
+        "lat": 31.2524186,
+        "lon": 75.70508
+      },
+      "to_startpoint": {
+        "lat": 31.2523447,
+        "lon": 75.7050889
+      },
+      "note": "Recording was stopped and restarted; physical path was not GPS-recorded during this gap."
+    },
+    {
+      "from_recording": "Block 32 to 34.gpx",
+      "to_recording": "Block 34 to BH4.gpx",
+      "gap_distance_m": 73.63,
+      "gap_bearing_deg": 271.7,
+      "time_gap_sec": 110.0,
+      "from_endpoint": {
+        "lat": 31.2515096,
+        "lon": 75.7050747
+      },
+      "to_startpoint": {
+        "lat": 31.2515297,
+        "lon": 75.7043005
+      },
+      "note": "Recording was stopped and restarted; physical path was not GPS-recorded during this gap."
+    }
+  ],
+  "summary": {
+    "total_points": 263,
+    "total_distance_m": 1734.03,
+    "total_distance_km": 1.734,
+    "total_duration_sec": 1368.0,
+    "unrecorded_gaps": 3,
+    "total_gap_distance_m": 103.77,
+    "all_valid": true
+  }
+}

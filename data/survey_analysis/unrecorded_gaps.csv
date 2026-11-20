@@ -1,0 +1,4 @@
+from_track,to_track,endpoint_gap_m,recording_time_gap_s,last_recorded_lat,last_recorded_lon,next_start_lat,next_start_lon,status
+Main Gate to Admission & class area,Block 30 to 32,21.9,21.0,31.2531338,75.7047218,31.2529843,75.7048714,not_recorded_not_verified
+Block 30 to 32,Block 32 to 34,8.3,9.0,31.2524186,75.70508,31.2523447,75.7050889,not_recorded_not_verified
+Block 32 to 34,Block 34 to BH4,73.6,110.0,31.2515096,75.7050747,31.2515297,75.7043005,not_recorded_not_verified

@@ -1,0 +1,136 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<gpx version="1.1" creator="OsmAnd 5.4.11" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net/docs/technical/osmand-file-formats/osmand-gpx" xmlns:gpxtpx="https://www8.garmin.com/xmlschemas/TrackPointExtensionv1.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 https://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>2026-11-20_12-20_Fri</name>
+  </metadata>
+  <trk>
+    <trkseg>
+      <trkpt lat="31.2523447" lon="75.7050889">
+        <ele>256.9</ele>
+        <time>2026-11-20T06:50:44Z</time>
+        <hdop>5.5</hdop>
+        <extensions>
+          <osmand:speed>0.7</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2522926" lon="75.7050989">
+        <ele>256.9</ele>
+        <time>2026-11-20T06:50:49Z</time>
+        <hdop>5.6</hdop>
+        <extensions>
+          <osmand:speed>1</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2522238" lon="75.7050636">
+        <ele>256.9</ele>
+        <time>2026-11-20T06:50:54Z</time>
+        <hdop>5.2</hdop>
+        <extensions>
+          <osmand:speed>1.1</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2521657" lon="75.7050579">
+        <ele>256.9</ele>
+        <time>2026-11-20T06:51:00Z</time>
+        <hdop>5.8</hdop>
+        <extensions>
+          <osmand:speed>1.2</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2521212" lon="75.7050468">
+        <ele>256.9</ele>
+        <time>2026-11-20T06:51:06Z</time>
+        <hdop>8.8</hdop>
+        <extensions>
+          <osmand:speed>1.3</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2520588" lon="75.7050512">
+        <ele>256.9</ele>
+        <time>2026-11-20T06:51:11Z</time>
+        <hdop>9.4</hdop>
+        <extensions>
+          <osmand:speed>1.2</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2519849" lon="75.7050356">
+        <ele>260.7</ele>
+        <time>2026-11-20T06:51:16Z</time>
+        <hdop>8.7</hdop>
+        <extensions>
+          <osmand:speed>1.1</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2519068" lon="75.7050295">
+        <ele>257.5</ele>
+        <time>2026-11-20T06:51:22Z</time>
+        <hdop>8.5</hdop>
+        <extensions>
+          <osmand:speed>1.1</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2518342" lon="75.7050317">
+        <ele>257.4</ele>
+        <time>2026-11-20T06:51:28Z</time>
+        <hdop>8.3</hdop>
+        <extensions>
+          <osmand:speed>1.1</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2517809" lon="75.7050332">
+        <ele>257.4</ele>
+        <time>2026-11-20T06:51:33Z</time>
+        <hdop>6.4</hdop>
+        <extensions>
+          <osmand:speed>1.1</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2517166" lon="75.7050539">
+        <ele>257.3</ele>
+        <time>2026-11-20T06:51:38Z</time>
+        <hdop>5.4</hdop>
+        <extensions>
+          <osmand:speed>1.4</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2516471" lon="75.7050602">
+        <ele>266.3</ele>
+        <time>2026-11-20T06:51:44Z</time>
+        <hdop>5.8</hdop>
+        <extensions>
+          <osmand:speed>1.2</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2515772" lon="75.7050716">
+        <ele>263.1</ele>
+        <time>2026-11-20T06:51:49Z</time>
+        <hdop>5.6</hdop>
+        <extensions>
+          <osmand:speed>1.2</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="31.2515096" lon="75.7050747">
+        <ele>263.1</ele>
+        <time>2026-11-20T06:51:55Z</time>
+        <hdop>5.6</hdop>
+        <extensions>
+          <osmand:speed>1.2</osmand:speed>
+        </extensions>
+      </trkpt>
+    </trkseg>
+  </trk>
+  <extensions>
+    <osmand:color>#00000000</osmand:color>
+    <osmand:coloring_type>solid</osmand:coloring_type>
+    <osmand:elevation_meters>1000.0</osmand:elevation_meters>
+    <osmand:line_3d_visualization_by_type>none</osmand:line_3d_visualization_by_type>
+    <osmand:line_3d_visualization_position_type>top</osmand:line_3d_visualization_position_type>
+    <osmand:line_3d_visualization_wall_color_type>none</osmand:line_3d_visualization_wall_color_type>
+    <osmand:show_arrows>false</osmand:show_arrows>
+    <osmand:show_start_finish>true</osmand:show_start_finish>
+    <osmand:split_interval>0.0</osmand:split_interval>
+    <osmand:split_type>no_split</osmand:split_type>
+    <osmand:vertical_exaggeration_scale>1.0</osmand:vertical_exaggeration_scale>
+    <osmand:width></osmand:width>
+  </extensions>
+</gpx>
