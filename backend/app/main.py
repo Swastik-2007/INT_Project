@@ -6,15 +6,19 @@ app = FastAPI(title="LPU Wayfinder Backend")
 
 @app.on_event("startup")
 async def startup_event():
-    # Initialize database tables
+    # Create missing tables; never drop or overwrite existing data.
     from .db import init_db
     init_db()
+    # Seed the five unverified campus blocks on a newly created database.
+    # The importer is idempotent and never changes existing location rows.
+    from scripts.seed_locations import seed_data
+    seed_data()
 
-# Allow frontend (localhost:5173) to access API
+# The frontend uses bearer tokens and relative API routes in development.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
