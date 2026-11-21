@@ -1,4 +1,4 @@
-import type { CampusLocation, RouteResponse } from './types'
+import type { CampusLocation, RouteResponse, NetworkStatusResponse } from './types'
 
 // Use relative path by default to work seamlessly with Vite proxy on desktop, LAN and Cloudflare tunnels
 const BACKEND = import.meta.env.VITE_BACKEND_URL || ''
@@ -27,14 +27,28 @@ export async function fetchLocation(id: number): Promise<CampusLocation | null> 
   }
 }
 
-export async function fetchWalkingRoute(originId: number, destinationId: number): Promise<RouteResponse> {
+export async function fetchWalkingRoute(
+  originId: number | string,
+  destinationId: number,
+  gpsCoords?: { lat: number; lon: number; accuracy?: number }
+): Promise<RouteResponse> {
   try {
-    const res = await fetch(`${BACKEND}/api/route?origin_id=${originId}&destination_id=${destinationId}`)
+    let url = `${BACKEND}/api/route?destination_id=${destinationId}`
+    if (originId === 'gps' && gpsCoords) {
+      url += `&origin_lat=${gpsCoords.lat}&origin_lon=${gpsCoords.lon}`
+      if (gpsCoords.accuracy) {
+        url += `&gps_accuracy=${gpsCoords.accuracy}`
+      }
+    } else {
+      url += `&origin_id=${originId}`
+    }
+
+    const res = await fetch(url)
     if (!res.ok) {
       return {
         available: false,
         message: 'Walking route not yet available. This area is awaiting mapping.',
-        origin: { id: originId, name: 'Origin', verified: false },
+        origin: { id: Number(originId) || -1, name: 'Origin', verified: false },
         destination: { id: destinationId, name: 'Destination', verified: false }
       }
     }
@@ -43,7 +57,7 @@ export async function fetchWalkingRoute(originId: number, destinationId: number)
     return {
       available: false,
       message: 'Walking route not yet available. This area is awaiting mapping.',
-      origin: { id: originId, name: 'Origin', verified: false },
+      origin: { id: Number(originId) || -1, name: 'Origin', verified: false },
       destination: { id: destinationId, name: 'Destination', verified: false }
     }
   }
@@ -90,5 +104,16 @@ export async function fetchSurveyTracks(): Promise<SurveyTracksGeoJSON> {
     return await res.json()
   } catch {
     return { type: 'FeatureCollection', features: [] }
+  }
+}
+
+export async function fetchNetworkStatus(): Promise<NetworkStatusResponse | null> {
+  try {
+    const res = await fetch(`${BACKEND}/api/network/status`)
+    if (!res.ok) return null
+    return await res.json()
+  } catch (err) {
+    console.warn('Error fetching pedestrian network status:', err)
+    return null
   }
 }

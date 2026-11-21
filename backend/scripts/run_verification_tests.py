@@ -156,6 +156,31 @@ def t12():
         assert len(data.get('gaps', [])) == 3
 test('12. Public /api/survey-tracks/analysis returns full GPX report (263 pts, 4 tracks, 3 gaps)', t12)
 
+# 13. Public /api/network/status returns pedestrian routing network topology
+def t13():
+    req = urllib.request.Request('http://127.0.0.1:5173/api/network/status')
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        data = json.loads(r.read().decode())
+        assert data.get('recorded_track_count') == 4
+        assert data.get('recorded_point_count') == 263
+        assert data.get('disconnected_components_count') == 4
+        assert data.get('routing_status', {}).get('available') is False
+        assert len(data.get('unrecorded_gaps', [])) == 3
+test('13. Public /api/network/status returns 4 tracks, 4 components, routing disabled', t13)
+
+# 14. Route API supports GPS snapping coordinates and returns safe unmapped notice
+def t14():
+    req = urllib.request.Request('http://127.0.0.1:5173/api/route?origin_lat=31.253018&origin_lon=75.703517&destination_id=4&gps_accuracy=8.0')
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        res = json.loads(r.read().decode())
+        assert res.get('available') is False
+        assert 'awaiting mapping' in res.get('message', '').lower()
+        assert res.get('origin', {}).get('id') == -1
+        assert res.get('destination', {}).get('id') == 4
+test('14. Public /api/route with live GPS coordinates snaps and handles unverified safely', t14)
+
 print('\n' + '='*70)
 print('AUTOMATED VERIFICATION TEST RESULTS')
 print('='*70)
