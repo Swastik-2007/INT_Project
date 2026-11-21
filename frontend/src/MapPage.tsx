@@ -20,8 +20,8 @@ import {
   Layers
 } from 'lucide-react'
 import { Navbar } from './Navbar'
-import { fetchLocations, fetchWalkingRoute, fetchSurveyTracks } from './api'
-import type { CampusLocation, RouteResponse, UserPosition } from './types'
+import { fetchLocations, fetchWalkingRoute, fetchSurveyTracks, fetchNetworkStatus } from './api'
+import type { CampusLocation, RouteResponse, UserPosition, NetworkStatusResponse } from './types'
 import type { SurveyTracksGeoJSON } from './api'
 
 // LPU Campus Approximate Center (Phagwara, Punjab)
@@ -79,6 +79,11 @@ export const MapPage: React.FC = () => {
   const [showTrackLegend, setShowTrackLegend] = useState(false)
   const surveyTrackLayerRef = useRef<L.LayerGroup | null>(null)
 
+  // Pedestrian Network Coverage & Survey Status State
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatusResponse | null>(null)
+  const [loadingNetworkStatus, setLoadingNetworkStatus] = useState(false)
+  const [networkStatusError, setNetworkStatusError] = useState<string | null>(null)
+
   // Leaflet Map Refs
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -109,6 +114,18 @@ export const MapPage: React.FC = () => {
         setSurveyTracks(data)
       }
     })
+    // Load pedestrian network survey status
+    setLoadingNetworkStatus(true)
+    fetchNetworkStatus()
+      .then(status => {
+        setNetworkStatus(status)
+        setLoadingNetworkStatus(false)
+      })
+      .catch(err => {
+        console.warn('Network status fetch error:', err)
+        setNetworkStatusError('Unable to load survey network status')
+        setLoadingNetworkStatus(false)
+      })
   }, [searchParams])
 
   // Initialize Leaflet Map
@@ -423,40 +440,52 @@ export const MapPage: React.FC = () => {
     // If origin is a specific campus location
     if (originId !== 'gps') {
       setLoadingRoute(true)
-      fetchWalkingRoute(Number(originId), Number(destinationId)).then(res => {
-        setRouteData(res)
-        setLoadingRoute(false)
-      })
+      fetchWalkingRoute(Number(originId), Number(destinationId))
+        .then(res => {
+          setRouteData(res)
+          setLoadingRoute(false)
+        })
+        .catch(() => {
+          setLoadingRoute(false)
+        })
     } else {
       // Origin is user's current GPS location
-      // Check if destination has verified entrance
-      if (!selectedDestination?.verified || !selectedDestination?.entrance_latitude) {
+      if (userPos) {
+        setLoadingRoute(true)
+        fetchWalkingRoute('gps', Number(destinationId), {
+          lat: userPos.lat,
+          lon: userPos.lon,
+          accuracy: userPos.accuracy
+        })
+          .then(res => {
+            setRouteData(res)
+            setLoadingRoute(false)
+          })
+          .catch(() => {
+            setLoadingRoute(false)
+            setRouteData({
+              available: false,
+              message: 'Walking route not yet available. This area is awaiting mapping.',
+              origin: { id: -1, name: 'Current Location', verified: true },
+              destination: {
+                id: Number(destinationId),
+                name: selectedDestination?.name || 'Destination',
+                verified: Boolean(selectedDestination?.verified)
+              },
+              distance: null,
+              duration: null
+            })
+          })
+      } else {
         setRemainingDistance(null)
         setRouteData({
           available: false,
-          message: 'Walking route not yet available. This area is awaiting mapping.',
-          origin: { id: -1, name: 'Current Location', verified: Boolean(userPos) },
+          message: 'Walking route not yet available. GPS location not acquired.',
+          origin: { id: -1, name: 'Current Location', verified: false },
           destination: {
             id: Number(destinationId),
             name: selectedDestination?.name || 'Destination',
-            verified: false
-          },
-          distance: null,
-          duration: null
-        })
-      } else {
-        // Destination has verified entrance, but pedestrian walkway path between GPS and entrance awaits survey
-        setRemainingDistance(null)
-        setRouteData({
-          available: false,
-          message: 'Walking route not yet available. This area is awaiting mapping.',
-          origin: { id: -1, name: 'Current Location', verified: Boolean(userPos) },
-          destination: {
-            id: selectedDestination.id,
-            name: selectedDestination.name,
-            verified: true,
-            latitude: selectedDestination.entrance_latitude,
-            longitude: selectedDestination.entrance_longitude
+            verified: Boolean(selectedDestination?.verified)
           },
           distance: null,
           duration: null
@@ -710,7 +739,7 @@ export const MapPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Survey Tracks Legend (when toggled on) */}
+        {/* Pedestrian Network Coverage & Survey Status Panel (when toggled on) */}
         {showSurveyTracks && showTrackLegend && (
           <div
             style={{
@@ -719,44 +748,143 @@ export const MapPage: React.FC = () => {
               right: 16,
               zIndex: 490,
               backgroundColor: '#FFFFFF',
-              borderRadius: 12,
-              padding: '0.75rem 1rem',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+              borderRadius: 14,
+              padding: '0.85rem 1rem',
+              boxShadow: '0 8px 25px rgba(0, 0, 0, 0.16)',
               border: '1px solid #E5E7EB',
-              maxWidth: 270,
+              maxWidth: 320,
+              maxHeight: 'calc(100vh - 180px)',
+              overflowY: 'auto',
               fontSize: '0.8rem'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontWeight: 700, color: '#20252D' }}>GPS Survey Tracks</span>
-              <button onClick={() => setShowTrackLegend(false)} style={{ color: '#9CA3AF', padding: 2 }}>
-                <X size={14} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Layers size={16} color="#E66A27" />
+                <span style={{ fontWeight: 800, color: '#20252D', fontSize: '0.88rem' }}>Pedestrian Network</span>
+              </div>
+              <button
+                onClick={() => setShowTrackLegend(false)}
+                aria-label="Close panel"
+                style={{ color: '#9CA3AF', padding: 2, borderRadius: 4 }}
+              >
+                <X size={15} />
               </button>
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#B45309', backgroundColor: '#FFFBEB', padding: '3px 6px', borderRadius: 6, marginBottom: 8, fontWeight: 600 }}>
-              ⚠ 4 Unverified Field Recordings
+
+            {/* Network Status Badge */}
+            <div
+              style={{
+                fontSize: '0.72rem',
+                color: '#B45309',
+                backgroundColor: '#FFFBEB',
+                border: '1px solid #FDE68A',
+                padding: '4px 8px',
+                borderRadius: 6,
+                marginBottom: 8,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5
+              }}
+            >
+              <AlertTriangle size={13} color="#D97706" />
+              <span>Field Survey Active • Routing Disabled</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 14, height: 3, backgroundColor: '#E63946', borderRadius: 2 }} />
-                <span style={{ color: '#4B5563' }}>A: Main Gate → Academic</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 14, height: 3, backgroundColor: '#2A9D8F', borderRadius: 2 }} />
-                <span style={{ color: '#4B5563' }}>B: Block 30 → 32</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 14, height: 3, backgroundColor: '#E9C46A', borderRadius: 2 }} />
-                <span style={{ color: '#4B5563' }}>C: Block 32 → 34</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 14, height: 3, backgroundColor: '#264653', borderRadius: 2 }} />
-                <span style={{ color: '#4B5563' }}>D: Block 34 → BH4</span>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginTop: 8, borderTop: '1px solid #F3F4F6', paddingTop: 6 }}>
-              Block 34 indoor passage: Unrecorded gap (73.6m)
-            </div>
+
+            {loadingNetworkStatus ? (
+              <div style={{ color: '#6B7280', fontSize: '0.75rem', padding: '6px 0' }}>Loading network status...</div>
+            ) : networkStatusError ? (
+              <div style={{ color: '#DC2626', fontSize: '0.75rem', padding: '4px 0' }}>{networkStatusError}</div>
+            ) : (
+              <>
+                {/* Metric Summary Grid */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 6,
+                    backgroundColor: '#F9FAFB',
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    marginBottom: 10,
+                    textAlign: 'center'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase' }}>Recorded</div>
+                    <div style={{ fontWeight: 800, color: '#20252D', fontSize: '0.82rem' }}>
+                      {networkStatus?.recorded_distance_meters ? `${(networkStatus.recorded_distance_meters / 1000).toFixed(2)} km` : '1.73 km'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase' }}>GPS Points</div>
+                    <div style={{ fontWeight: 800, color: '#20252D', fontSize: '0.82rem' }}>
+                      {networkStatus?.recorded_point_count || 263}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase' }}>Components</div>
+                    <div style={{ fontWeight: 800, color: '#B45309', fontSize: '0.82rem' }}>
+                      {networkStatus?.disconnected_components_count || 4} Disconn.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Survey Tracks List */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Survey Tracks (4 Recorded)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 14, height: 3, backgroundColor: '#E63946', borderRadius: 2 }} />
+                        <span style={{ color: '#4B5563', fontSize: '0.75rem' }}>Track A: Gate → Academic</span>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>911m</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 14, height: 3, backgroundColor: '#2A9D8F', borderRadius: 2 }} />
+                        <span style={{ color: '#4B5563', fontSize: '0.75rem' }}>Track B: Block 30 → 32</span>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>78m</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 14, height: 3, backgroundColor: '#E9C46A', borderRadius: 2 }} />
+                        <span style={{ color: '#4B5563', fontSize: '0.75rem' }}>Track C: Block 32 → 34</span>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>94m</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 14, height: 3, backgroundColor: '#264653', borderRadius: 2 }} />
+                        <span style={{ color: '#4B5563', fontSize: '0.75rem' }}>Track D: Block 34 → BH4</span>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>651m</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Missing Connections / Gaps */}
+                <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: 6, marginTop: 4 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#B45309', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Missing Connections (Gaps)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.71rem', color: '#6B7280' }}>
+                    <div>• <strong>Gap 1 (21.9m):</strong> Academic end → Block 30</div>
+                    <div>• <strong>Gap 2 (8.3m):</strong> Block 32 South → Block 32 North</div>
+                    <div>• <strong>Gap 3 (73.6m):</strong> Block 34 Ground Floor Indoor Passage</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.68rem', color: '#9CA3AF', marginTop: 8, fontStyle: 'italic', borderTop: '1px solid #F3F4F6', paddingTop: 6 }}>
+                  Verified edges: 0/259. Automated interpolation disabled to prevent misleading directions.
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -984,7 +1112,10 @@ export const MapPage: React.FC = () => {
                       <Info size={18} color="#E66A27" style={{ flexShrink: 0, marginTop: 2 }} />
                       <div style={{ fontSize: '0.85rem', color: '#4B5563', lineHeight: 1.4 }}>
                         <div style={{ fontWeight: 700, color: '#20252D' }}>
-                          Walking route not yet available. This area is awaiting mapping.
+                          {routeData.message || 'Walking route not yet available. This area is awaiting mapping.'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 4 }}>
+                          Pedestrian routing is strictly restricted to verified surveyed pathways. Field verification of recorded tracks is required before routing is enabled.
                         </div>
                       </div>
                     </div>

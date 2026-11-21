@@ -127,54 +127,147 @@ def create_walkway(walkway: schemas.WalkwayCreate, db: Session = Depends(get_db)
 
 # ---- Walking Route (Public) ----
 @api_router.get("/route")
-def get_walking_route(origin_id: int, destination_id: int, db: Session = Depends(get_db)):
-    orig = crud.get_location(db, origin_id)
+def get_walking_route(
+    origin_id: Optional[int] = None,
+    destination_id: Optional[int] = None,
+    origin_lat: Optional[float] = None,
+    origin_lon: Optional[float] = None,
+    gps_accuracy: Optional[float] = None,
+    db: Session = Depends(get_db)
+):
+    from .pedestrian_network import get_pedestrian_network
+    network = get_pedestrian_network()
+
+    # Destination is mandatory
+    if destination_id is None:
+        raise HTTPException(status_code=400, detail="destination_id is required")
+
     dest = crud.get_location(db, destination_id)
-    if not orig or not dest:
-        raise HTTPException(status_code=404, detail="Origin or destination location not found")
+    if not dest:
+        raise HTTPException(status_code=404, detail="Destination location not found")
 
-    # Strictly check if both locations are verified and have real entrance coordinates
-    if not orig.verified or not dest.verified or not orig.entrance_latitude or not dest.entrance_latitude:
+    # If origin_id is provided, resolve from location database
+    if origin_id is not None:
+        orig = crud.get_location(db, origin_id)
+        if not orig:
+            raise HTTPException(status_code=404, detail="Origin location not found")
+
+        origin_meta = {"id": orig.id, "name": orig.name, "verified": orig.verified}
+
+        # Strictly check if both locations are verified with ground-truth entrance coordinates
+        if not orig.verified or not dest.verified or not orig.entrance_latitude or not dest.entrance_latitude:
+            return {
+                "available": False,
+                "message": "Walking route not yet available. This area is awaiting mapping.",
+                "origin": origin_meta,
+                "destination": {"id": dest.id, "name": dest.name, "verified": dest.verified},
+                "distance": None,
+                "duration": None,
+                "geometry": None
+            }
+
+        # Query database walkways graph
+        import networkx as nx
+        G = nx.Graph()
+        walkways = crud.get_walkways(db, limit=1000)
+        for w in walkways:
+            G.add_edge(w.source_id, w.target_id, weight=w.distance, geometry=w.geometry_wkt)
+
+        if not G.has_node(orig.id) or not G.has_node(dest.id) or not nx.has_path(G, orig.id, dest.id):
+            return {
+                "available": False,
+                "message": "Walking route not yet available. This area is awaiting mapping.",
+                "origin": origin_meta,
+                "destination": {"id": dest.id, "name": dest.name, "verified": dest.verified},
+                "distance": None,
+                "duration": None,
+                "geometry": None
+            }
+
+        path = nx.shortest_path(G, source=orig.id, target=dest.id, weight="weight")
+        total_dist = nx.shortest_path_length(G, source=orig.id, target=dest.id, weight="weight")
+        duration_sec = int(total_dist / 1.2)  # ~1.2 m/s average walking speed
+
+        return {
+            "available": True,
+            "message": "Verified route found.",
+            "origin": {"id": orig.id, "name": orig.name, "latitude": orig.entrance_latitude, "longitude": orig.entrance_longitude},
+            "destination": {"id": dest.id, "name": dest.name, "latitude": dest.entrance_latitude, "longitude": dest.entrance_longitude},
+            "distance": round(total_dist, 1),
+            "duration": duration_sec,
+            "path_node_ids": path,
+        }
+
+    # Otherwise origin is live GPS coordinates
+    elif origin_lat is not None and origin_lon is not None:
+        origin_meta = {
+            "id": -1,
+            "name": "Current Location",
+            "verified": False,
+            "latitude": origin_lat,
+            "longitude": origin_lon
+        }
+
+        # Destination must be verified with real entrance
+        if not dest.verified or not dest.entrance_latitude:
+            return {
+                "available": False,
+                "message": "Walking route not yet available. This area is awaiting mapping.",
+                "origin": origin_meta,
+                "destination": {"id": dest.id, "name": dest.name, "verified": dest.verified},
+                "distance": None,
+                "duration": None,
+                "geometry": None
+            }
+
+        # Snap GPS to verified network edges
+        snap_result = network.snap_to_network(
+            lat=origin_lat,
+            lon=origin_lon,
+            max_distance_m=30.0,
+            accuracy_m=gps_accuracy,
+            only_verified=True
+        )
+
+        if not snap_result["snapped"]:
+            return {
+                "available": False,
+                "message": f"Walking route not yet available. {snap_result['reason']}",
+                "origin": origin_meta,
+                "destination": {"id": dest.id, "name": dest.name, "verified": dest.verified},
+                "distance": None,
+                "duration": None,
+                "geometry": None
+            }
+
         return {
             "available": False,
-            "message": "Walking route not yet available. This area is awaiting mapping.",
-            "origin": {"id": orig.id, "name": orig.name, "verified": orig.verified},
+            "message": "Walking route not yet available. Pathway is awaiting verification.",
+            "origin": origin_meta,
             "destination": {"id": dest.id, "name": dest.name, "verified": dest.verified},
             "distance": None,
             "duration": None,
             "geometry": None
         }
 
-    import networkx as nx
-    G = nx.Graph()
-    walkways = crud.get_walkways(db, limit=1000)
-    for w in walkways:
-        G.add_edge(w.source_id, w.target_id, weight=w.distance, geometry=w.geometry_wkt)
+    else:
+        raise HTTPException(status_code=400, detail="Either origin_id or origin_lat and origin_lon must be provided")
 
-    if not G.has_node(orig.id) or not G.has_node(dest.id) or not nx.has_path(G, orig.id, dest.id):
-        return {
-            "available": False,
-            "message": "Walking route not yet available. This area is awaiting mapping.",
-            "origin": {"id": orig.id, "name": orig.name, "verified": orig.verified},
-            "destination": {"id": dest.id, "name": dest.name, "verified": dest.verified},
-            "distance": None,
-            "duration": None,
-            "geometry": None
-        }
 
-    path = nx.shortest_path(G, source=orig.id, target=dest.id, weight="weight")
-    total_dist = nx.shortest_path_length(G, source=orig.id, target=dest.id, weight="weight")
-    duration_sec = int(total_dist / 1.2)  # ~1.2 m/s average walking speed
-
-    return {
-        "available": True,
-        "message": "Verified route found.",
-        "origin": {"id": orig.id, "name": orig.name, "latitude": orig.entrance_latitude, "longitude": orig.entrance_longitude},
-        "destination": {"id": dest.id, "name": dest.name, "latitude": dest.entrance_latitude, "longitude": dest.entrance_longitude},
-        "distance": round(total_dist, 1),
-        "duration": duration_sec,
-        "path_node_ids": path,
-    }
+# ---- Pedestrian Network Status (Public) ----
+@api_router.get("/network/status")
+def get_network_status():
+    """
+    Return comprehensive pedestrian network topology and coverage statistics:
+    - Recorded track count, point count, distance (meters)
+    - Verified and unverified segment counts
+    - Disconnected components count
+    - Details of unrecorded physical gaps (e.g. Block 34 indoor passage)
+    - Routing availability status
+    """
+    from .pedestrian_network import get_pedestrian_network
+    network = get_pedestrian_network()
+    return network.get_network_status()
 
 # ---- Surveys (admin-protected) ----
 @api_router.get("/admin/surveys")
