@@ -181,6 +181,70 @@ def t14():
         assert res.get('destination', {}).get('id') == 4
 test('14. Public /api/route with live GPS coordinates snaps and handles unverified safely', t14)
 
+# 15. Public /api/verification/status returns verification metrics
+def t15():
+    req = urllib.request.Request('http://127.0.0.1:5173/api/verification/status')
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        data = json.loads(r.read().decode())
+        assert 'tracks' in data
+        assert data['tracks']['total'] == 4
+        assert 'gaps' in data
+        assert data['gaps']['total'] == 3
+        assert 'entrances' in data
+        assert data['entrances']['total'] >= 5
+        assert data['routing_ready'] is False
+test('15. Public /api/verification/status returns verification progress summary', t15)
+
+# 16. Admin verification endpoint strictly requires authentication
+def t16():
+    req = urllib.request.Request('http://127.0.0.1:5173/api/admin/verification/pending')
+    try:
+        urllib.request.urlopen(req, timeout=5)
+        assert False, 'Expected 401 Unauthorized'
+    except urllib.error.HTTPError as e:
+        assert e.code == 401, f'Expected 401, got {e.code}'
+test('16. Admin /api/admin/verification/pending rejects unauthenticated calls (401)', t16)
+
+# 17. Authenticated request to /api/admin/verification/pending succeeds (non-mutating)
+def t17():
+    exp = datetime.utcnow() + timedelta(hours=1)
+    tok = jwt.encode({'sub': 'admin', 'exp': exp}, SECRET_KEY, algorithm='HS256')
+    req = urllib.request.Request(
+        'http://127.0.0.1:5173/api/admin/verification/pending',
+        headers={'Authorization': f'Bearer {tok}'}
+    )
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        data = json.loads(r.read().decode())
+        assert len(data.get('tracks', [])) == 4
+        assert len(data.get('gaps', [])) == 3
+        assert len(data.get('locations', [])) >= 5
+test('17. Admin /api/admin/verification/pending accepts valid JWT and lists items', t17)
+
+# 18. Authenticated request to /api/admin/verification/history succeeds
+def t18():
+    exp = datetime.utcnow() + timedelta(hours=1)
+    tok = jwt.encode({'sub': 'admin', 'exp': exp}, SECRET_KEY, algorithm='HS256')
+    req = urllib.request.Request(
+        'http://127.0.0.1:5173/api/admin/verification/history',
+        headers={'Authorization': f'Bearer {tok}'}
+    )
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        logs = json.loads(r.read().decode())
+        assert isinstance(logs, list)
+test('18. Admin /api/admin/verification/history returns decision audit log', t18)
+
+# 19. Admin Verification UI page accessible
+def t19():
+    req = urllib.request.Request('http://127.0.0.1:5173/admin/verify')
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        html = r.read().decode()
+        assert '<div id="root">' in html
+test('19. Route Verification Interface (/admin/verify) accessible in frontend', t19)
+
 print('\n' + '='*70)
 print('AUTOMATED VERIFICATION TEST RESULTS')
 print('='*70)

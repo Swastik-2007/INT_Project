@@ -1,4 +1,11 @@
-import type { CampusLocation, RouteResponse, NetworkStatusResponse } from './types'
+import type {
+  CampusLocation,
+  RouteResponse,
+  NetworkStatusResponse,
+  VerificationPendingData,
+  AuditLogItem,
+  PublicVerificationStatus
+} from './types'
 
 // Use relative path by default to work seamlessly with Vite proxy on desktop, LAN and Cloudflare tunnels
 const BACKEND = import.meta.env.VITE_BACKEND_URL || ''
@@ -114,6 +121,104 @@ export async function fetchNetworkStatus(): Promise<NetworkStatusResponse | null
     return await res.json()
   } catch (err) {
     console.warn('Error fetching pedestrian network status:', err)
+    return null
+  }
+}
+
+// ----- Phase 2B Verification API Calls -----
+
+export async function fetchPendingVerification(token: string): Promise<VerificationPendingData | null> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/verification/pending`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch (err) {
+    console.warn('Error fetching pending verification:', err)
+    return null
+  }
+}
+
+export async function submitVerificationEvidence(token: string, payload: any): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/verification/evidence`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: data?.detail || 'Failed to submit evidence' }
+    }
+    return { success: true, data }
+  } catch {
+    return { success: false, error: 'Cannot connect to backend server.' }
+  }
+}
+
+export async function reviewVerificationEvidence(token: string, payload: { evidence_id: number; action: string; review_notes: string }): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/verification/review`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: data?.detail || 'Failed to review evidence' }
+    }
+    return { success: true, data }
+  } catch {
+    return { success: false, error: 'Cannot connect to backend server.' }
+  }
+}
+
+export async function verifyBuildingEntrance(token: string, payload: { location_id: number; entrance_latitude: number; entrance_longitude: number; door_name?: string; verification_source: string }): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/verification/entrance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: data?.detail || 'Failed to verify entrance' }
+    }
+    return { success: true, data }
+  } catch {
+    return { success: false, error: 'Cannot connect to backend server.' }
+  }
+}
+
+export async function fetchVerificationHistory(token: string, limit: number = 100): Promise<AuditLogItem[]> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/verification/history?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
+export async function fetchPublicVerificationStatus(): Promise<PublicVerificationStatus | null> {
+  try {
+    const res = await fetch(`${BACKEND}/api/verification/status`)
+    if (!res.ok) return null
+    return await res.json()
+  } catch (err) {
+    console.warn('Error fetching public verification status:', err)
     return null
   }
 }

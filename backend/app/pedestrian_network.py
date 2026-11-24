@@ -71,6 +71,12 @@ class PedestrianNetwork:
         if not self.geojson_path.exists():
             return
 
+        # Check durable verification store for approved tracks and gap connections
+        from .verification_store import load_durable_evidence
+        approved_evidence = [e for e in load_durable_evidence() if e.get("status") == "approved"]
+        approved_track_ids = {str(e.get("target_id")) for e in approved_evidence if e.get("target_type") == "track"}
+        approved_gap_evidence = {str(e.get("target_id")): e for e in approved_evidence if e.get("target_type") == "gap"}
+
         with open(self.geojson_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -86,7 +92,8 @@ class PedestrianNetwork:
             coords = feat.get("geometry", {}).get("coordinates", [])
             track_name = props.get("name", f"track_{track_idx + 1}")
             segment_label = props.get("segment_label", f"Segment {track_idx + 1}")
-            is_verified = bool(props.get("verified", False))
+            track_id = f"track_{track_idx}"
+            is_verified = bool(props.get("verified", False)) or (track_id in approved_track_ids)
 
             track_dist = 0.0
             point_count = len(coords)
@@ -183,6 +190,7 @@ class PedestrianNetwork:
                         "status": "unrecorded_physical_gap",
                         "note": g.get("note", "Physical path between recordings was unrecorded.")
                     })
+                self._apply_gap_verifications()
                 return
             except Exception:
                 pass
@@ -208,6 +216,45 @@ class PedestrianNetwork:
                 "status": "unrecorded_physical_gap",
                 "note": "Deliberate recording pause; connection unverified."
             })
+        self._apply_gap_verifications()
+
+    def _apply_gap_verifications(self) -> None:
+        """
+        Integrate approved pedestrian segments into the NetworkX graph ONLY
+        when their geometry and endpoints have been explicitly validated.
+        Never interpolates across unverified gaps.
+        """
+        from .verification_store import load_durable_evidence
+        approved_evidence = [e for e in load_durable_evidence() if e.get("status") == "approved"]
+        approved_gap_evidence = {str(e.get("target_id")): e for e in approved_evidence if e.get("target_type") == "gap"}
+
+        for gap_idx, gap in enumerate(self.unrecorded_gaps):
+            gap_id = f"gap_{gap_idx + 1}"
+            if gap_id in approved_gap_evidence:
+                ev = approved_gap_evidence[gap_id]
+                gap["verified"] = True
+                gap["verified_by"] = ev.get("reviewed_by")
+                gap["verified_at"] = ev.get("reviewed_at")
+                gap["status"] = "verified_field_walkway"
+                s_lat = ev.get("gps_start_lat")
+                s_lon = ev.get("gps_start_lon")
+                e_lat = ev.get("gps_end_lat")
+                e_lon = ev.get("gps_end_lon")
+                if s_lat is not None and s_lon is not None and e_lat is not None and e_lon is not None:
+                    snap_s = self.snap_to_network(s_lat, s_lon, max_distance_m=15.0)
+                    snap_e = self.snap_to_network(e_lat, e_lon, max_distance_m=15.0)
+                    if snap_s["snapped"] and snap_e["snapped"] and snap_s["node_id"] != snap_e["node_id"]:
+                        conn_dist = haversine_distance_m(s_lat, s_lon, e_lat, e_lon)
+                        self.graph.add_edge(
+                            snap_s["node_id"],
+                            snap_e["node_id"],
+                            weight=conn_dist,
+                            distance_m=round(conn_dist, 2),
+                            verified=True,
+                            gap_id=gap_id,
+                            segment_label=f"Verified Walkway: {gap_id}"
+                        )
+                        self.verified_segment_count += 1
 
     def get_connected_components(self) -> List[List[str]]:
         """Return the list of connected components in the pedestrian graph."""
@@ -392,4 +439,11 @@ def get_pedestrian_network() -> PedestrianNetwork:
     global _pedestrian_network_instance
     if _pedestrian_network_instance is None:
         _pedestrian_network_instance = PedestrianNetwork()
+    return _pedestrian_network_instance
+
+
+def reload_pedestrian_network() -> PedestrianNetwork:
+    """Force re-construction of the pedestrian network singleton with latest verification data."""
+    global _pedestrian_network_instance
+    _pedestrian_network_instance = PedestrianNetwork()
     return _pedestrian_network_instance
