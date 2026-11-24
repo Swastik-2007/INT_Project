@@ -12,28 +12,74 @@ export interface CampusLocation {
   entrance_longitude?: number | null
   centroid_latitude?: number | null
   centroid_longitude?: number | null
+  is_surveyed_waypoint?: boolean
+  target_type?: string
+}
+
+export interface RouteSegment {
+  label: string
+  type: string
+  is_indoor: boolean
+  distance_m: number
+  instruction: string
+  coordinates: [number, number][]
 }
 
 export interface RouteResponse {
   available: boolean
   message: string
+  reason_code?: string
+  connection_id?: string
+  connection_name?: string
+  is_indoor?: boolean
+  straight_line_gap_m?: number
   origin: {
     id: number
     name: string
-    verified: boolean
+    verified?: boolean
     latitude?: number | null
     longitude?: number | null
+    snapped_node?: string
+    snap_distance_m?: number
   }
   destination: {
     id: number
     name: string
-    verified: boolean
+    verified?: boolean
     latitude?: number | null
     longitude?: number | null
+    is_surveyed_waypoint?: boolean
   }
   distance?: number | null // meters
   duration?: number | null // seconds
-  path_node_ids?: number[]
+  duration_text?: string
+  path_node_ids?: string[]
+  geometry?: {
+    type: 'LineString'
+    coordinates: [number, number][]
+  } | null
+  segments?: RouteSegment[]
+  has_indoor?: boolean
+}
+
+export interface ConfirmedConnectionItem {
+  id: string
+  name: string
+  from_track: string
+  from_node: string
+  from_coords: [number, number]
+  to_track: string
+  to_node: string
+  to_coords: [number, number]
+  straight_line_gap_m: number
+  classification: string
+  is_indoor: boolean
+  status: string
+  has_explicit_geometry: boolean
+  traversable_confirmed_by?: string | null
+  intermediate_waypoints: [number, number][]
+  measured_distance_m?: number | null
+  notes?: string | null
 }
 
 export interface UserPosition {

@@ -11,14 +11,20 @@ import {
   Compass,
   Footprints,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  RotateCcw
 } from 'lucide-react'
 import {
   fetchPendingVerification,
   submitVerificationEvidence,
   reviewVerificationEvidence,
   verifyBuildingEntrance,
-  fetchVerificationHistory
+  revokeBuildingEntrance,
+  fetchVerificationHistory,
+  fetchConfirmedConnections,
+  updateConnectionGeometry,
+  confirmDirectConnection,
+  resetConnectionGeometry
 } from './api'
 import type {
   VerificationPendingData,
@@ -28,12 +34,14 @@ import type {
 export default function VerificationPage() {
   const navigate = useNavigate()
   const [token] = useState(() => sessionStorage.getItem('lpu_token') || '')
-  const [activeTab, setActiveTab] = useState<'tracks' | 'gaps' | 'entrances' | 'audit'>('tracks')
+  const [activeTab, setActiveTab] = useState<'tracks' | 'gaps' | 'entrances' | 'connections' | 'audit'>('tracks')
 
   // Data state
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<VerificationPendingData | null>(null)
   const [history, setHistory] = useState<AuditLogItem[]>([])
+  const [connections, setConnections] = useState<any[]>([])
+  const [waypointInputs, setWaypointInputs] = useState<{ [id: string]: string }>({})
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   // Evidence modal / form state
@@ -62,6 +70,7 @@ export default function VerificationPage() {
   const [doorName, setDoorName] = useState('Main North Entrance')
   const [verificationSource, setVerificationSource] = useState('Physical Doorway GPS Reading')
   const [submittingEntrance, setSubmittingEntrance] = useState(false)
+  const [revokingLocationId, setRevokingLocationId] = useState<number | null>(null)
 
   // Check authentication
   useEffect(() => {
@@ -79,7 +88,65 @@ export default function VerificationPage() {
     }
     const auditLogs = await fetchVerificationHistory(token, 100)
     setHistory(auditLogs)
+    const connData = await fetchConfirmedConnections()
+    if (connData?.connections) {
+      setConnections(connData.connections)
+      const initialInputs: { [id: string]: string } = {}
+      for (const c of connData.connections) {
+        if (c.intermediate_waypoints && c.intermediate_waypoints.length > 0) {
+          initialInputs[c.id] = c.intermediate_waypoints.map((wp: number[]) => `${wp[0]}, ${wp[1]}`).join('\n')
+        }
+      }
+      setWaypointInputs(initialInputs)
+    }
     setLoading(false)
+  }
+
+  const handleConfirmDirect = async (connId: string) => {
+    if (!token) return
+    const res = await confirmDirectConnection(token, connId, 'Confirmed direct continuous walkway link')
+    if (res.success) {
+      setMessage({ text: 'Direct walkway connection confirmed and integrated into pedestrian network!', type: 'success' })
+      loadData()
+    } else {
+      setMessage({ text: res.error || 'Failed to confirm connection', type: 'error' })
+    }
+  }
+
+  const handleSaveWaypoints = async (connId: string) => {
+    if (!token) return
+    const raw = waypointInputs[connId] || ''
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean)
+    const waypoints: [number, number][] = []
+
+    for (const line of lines) {
+      const parts = line.split(',').map(p => parseFloat(p.trim()))
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        waypoints.push([parts[0], parts[1]])
+      } else {
+        setMessage({ text: `Invalid waypoint line: "${line}". Format must be latitude, longitude (e.g. 31.251520, 75.704680)`, type: 'error' })
+        return
+      }
+    }
+
+    const res = await updateConnectionGeometry(token, connId, waypoints, 'Surveyor-defined pathway waypoints')
+    if (res.success) {
+      setMessage({ text: `Connection geometry saved (${res.data?.measured_distance_m}m) and graph connected!`, type: 'success' })
+      loadData()
+    } else {
+      setMessage({ text: res.error || 'Failed to save connection geometry', type: 'error' })
+    }
+  }
+
+  const handleResetConnection = async (connId: string) => {
+    if (!token) return
+    const res = await resetConnectionGeometry(token, connId)
+    if (res.success) {
+      setMessage({ text: 'Connection geometry reset to pending. Graph nodes disconnected for safety.', type: 'success' })
+      loadData()
+    } else {
+      setMessage({ text: res.error || 'Failed to reset connection', type: 'error' })
+    }
   }
 
   useEffect(() => {
@@ -208,6 +275,28 @@ export default function VerificationPage() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     )
+  }
+
+  // Handle Revoke Entrance Verification
+  const handleRevokeEntrance = async (locationId: number, locationName: string) => {
+    if (!token) {
+      setMessage({ text: 'Administrator authentication required.', type: 'error' })
+      return
+    }
+    const confirmed = window.confirm(
+      `Are you sure you want to revoke verified entrance coordinates for ${locationName}?\n\nThis will reset its verification status to Unverified, clear registered doorway coordinates, and remove it from the durable verification store.`
+    )
+    if (!confirmed) return
+
+    setRevokingLocationId(locationId)
+    const res = await revokeBuildingEntrance(token, locationId)
+    setRevokingLocationId(null)
+    if (res.success) {
+      setMessage({ text: `Entrance verification revoked for ${locationName}. Status reset to Unverified.`, type: 'success' })
+      loadData()
+    } else {
+      setMessage({ text: res.error || 'Failed to revoke entrance verification.', type: 'error' })
+    }
   }
 
   return (
@@ -408,6 +497,25 @@ export default function VerificationPage() {
             }}
           >
             <Building size={17} /> Building Entrances ({data?.total_locations_count || 5})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('connections')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              border: 'none',
+              borderBottom: activeTab === 'connections' ? '3px solid #E66A27' : '3px solid transparent',
+              backgroundColor: 'transparent',
+              color: activeTab === 'connections' ? '#E66A27' : '#6B7280',
+              fontWeight: 700,
+              fontSize: '0.92rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <Compass size={17} /> Confirmed Walkways & Corridors ({connections.length || 3})
           </button>
 
           <button
@@ -890,7 +998,7 @@ export default function VerificationPage() {
                           border: `1px solid ${loc.verified ? '#BBF7D0' : '#FDE68A'}`
                         }}
                       >
-                        {loc.verified ? '✓ Verified Doorway' : '⚠ Survey Pending'}
+                        {loc.verified ? '✓ Verified Doorway' : '⚠ Unverified'}
                       </span>
                     </div>
 
@@ -904,12 +1012,250 @@ export default function VerificationPage() {
                       </div>
                     ) : (
                       <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4, fontStyle: 'italic' }}>
-                        No verified doorway registered yet.
+                        Unverified — No registered doorway coordinates
+                      </div>
+                    )}
+
+                    {loc.verified && (
+                      <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeEntrance(loc.id, loc.name)}
+                          disabled={revokingLocationId === loc.id}
+                          style={{
+                            padding: '5px 12px',
+                            backgroundColor: '#FEE2E2',
+                            color: '#B91C1C',
+                            border: '1px solid #FCA5A5',
+                            borderRadius: 8,
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: revokingLocationId === loc.id ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5
+                          }}
+                        >
+                          <RotateCcw size={13} />
+                          {revokingLocationId === loc.id ? 'Revoking...' : 'Revoke Verification'}
+                        </button>
                       </div>
                     )}
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Confirmed Walkways & Corridors */}
+        {activeTab === 'connections' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ backgroundColor: '#FFF8F1', border: '1px solid #FED7AA', borderRadius: 14, padding: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#C2410C', fontWeight: 800, fontSize: '1.05rem', marginBottom: 6 }}>
+                <Compass size={20} /> Surveyor-Confirmed Physical Walkway Connections
+              </div>
+              <p style={{ margin: 0, fontSize: '0.88rem', color: '#7C2D12', lineHeight: 1.5 }}>
+                All 4 OsmAnd GPX recordings were physically walked on campus. The interruptions occurred because the surveyor intentionally paused and restarted recordings. These links are confirmed physically traversable; define exact hallway waypoints or confirm direct links below to connect the NetworkX graph.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {connections.map((conn: any) => {
+                const isIndoor = conn.is_indoor
+                const hasGeom = conn.has_explicit_geometry
+                return (
+                  <div
+                    key={conn.id}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      border: '1px solid #E5E7EB',
+                      padding: '1.25rem',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: '0.75rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#20252D' }}>{conn.name}</span>
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              backgroundColor: isIndoor ? '#FEF3C7' : '#F3F4F6',
+                              color: isIndoor ? '#92400E' : '#374151'
+                            }}
+                          >
+                            {isIndoor ? '🏢 Indoor Corridor' : '🚶 Outdoor Walkway'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: 4 }}>
+                          {conn.from_track} → {conn.to_track}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            padding: '4px 10px',
+                            borderRadius: 999,
+                            backgroundColor: hasGeom ? '#ECFDF5' : '#FFFBEB',
+                            color: hasGeom ? '#065F46' : '#B45309',
+                            border: `1px solid ${hasGeom ? '#A7F3D0' : '#FDE68A'}`
+                          }}
+                        >
+                          {hasGeom ? `✓ Connected (${conn.measured_distance_m || Math.round(conn.straight_line_gap_m)}m)` : '⚠ Geometry Pending (Graph Disconnected)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Coordinates Breakdown */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, backgroundColor: '#F9FAFB', padding: '10px 12px', borderRadius: 10, fontSize: '0.78rem', marginBottom: '1rem' }}>
+                      <div>
+                        <div style={{ color: '#6B7280', fontWeight: 600 }}>From Endpoint ({conn.from_node}):</div>
+                        <div style={{ fontFamily: 'monospace', color: '#1F2937', marginTop: 2 }}>{conn.from_coords?.[0]?.toFixed(6)}, {conn.from_coords?.[1]?.toFixed(6)}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#6B7280', fontWeight: 600 }}>To Endpoint ({conn.to_node}):</div>
+                        <div style={{ fontFamily: 'monospace', color: '#1F2937', marginTop: 2 }}>{conn.to_coords?.[0]?.toFixed(6)}, {conn.to_coords?.[1]?.toFixed(6)}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#6B7280', fontWeight: 600 }}>Straight-Line Gap:</div>
+                        <div style={{ fontWeight: 800, color: '#20252D', marginTop: 2 }}>{conn.straight_line_gap_m} meters</div>
+                      </div>
+                    </div>
+
+                    {/* Waypoint Editor for Corridors / Custom Paths */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: 4 }}>
+                        Intermediate Waypoints (one [lat, lon] per line):
+                      </label>
+                      <textarea
+                        rows={isIndoor ? 3 : 2}
+                        value={waypointInputs[conn.id] || ''}
+                        onChange={e => setWaypointInputs({ ...waypointInputs, [conn.id]: e.target.value })}
+                        placeholder={isIndoor ? "e.g.\n31.251520, 75.704687" : "Leave blank for direct straight walkway, or enter turns"}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          borderRadius: 8,
+                          border: '1px solid #D1D5DB',
+                          fontSize: '0.8rem',
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                    </div>
+
+                    {/* Quick Helper Buttons for Block 34 */}
+                    {isIndoor && (
+                      <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWaypointInputs({
+                              ...waypointInputs,
+                              [conn.id]: '31.251520, 75.704687'
+                            })
+                          }}
+                          style={{
+                            fontSize: '0.75rem',
+                            backgroundColor: '#FEF3C7',
+                            border: '1px solid #F59E0B',
+                            color: '#92400E',
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            fontWeight: 600
+                          }}
+                        >
+                          Preset: Straight Ground-Floor Hallway
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWaypointInputs({
+                              ...waypointInputs,
+                              [conn.id]: '31.251515, 75.704800\n31.251525, 75.704500'
+                            })
+                          }}
+                          style={{
+                            fontSize: '0.75rem',
+                            backgroundColor: '#FEF3C7',
+                            border: '1px solid #F59E0B',
+                            color: '#92400E',
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            fontWeight: 600
+                          }}
+                        >
+                          Preset: Corridor with Central Lobby Waypoint
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {!isIndoor && (
+                        <button
+                          onClick={() => handleConfirmDirect(conn.id)}
+                          style={{
+                            backgroundColor: '#10B981',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            padding: '6px 14px',
+                            borderRadius: 8,
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✓ Confirm Direct Walkway ({conn.straight_line_gap_m}m)
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleSaveWaypoints(conn.id)}
+                        style={{
+                          backgroundColor: '#E66A27',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: 8,
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        💾 Save Waypoints & Connect Graph
+                      </button>
+
+                      {hasGeom && (
+                        <button
+                          onClick={() => handleResetConnection(conn.id)}
+                          style={{
+                            backgroundColor: '#F3F4F6',
+                            color: '#6B7280',
+                            border: '1px solid #D1D5DB',
+                            padding: '6px 12px',
+                            borderRadius: 8,
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Reset to Unconnected Gap
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

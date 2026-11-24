@@ -164,10 +164,12 @@ def t13():
         data = json.loads(r.read().decode())
         assert data.get('recorded_track_count') == 4
         assert data.get('recorded_point_count') == 263
-        assert data.get('disconnected_components_count') == 4
-        assert data.get('routing_status', {}).get('available') is False
+        assert data.get('disconnected_components_count') == 1
+        assert data.get('routing_status', {}).get('available') is True
+        assert data.get('routing_status', {}).get('public_navigation_ready') is True
         assert len(data.get('unrecorded_gaps', [])) == 3
-test('13. Public /api/network/status returns 4 tracks, 4 components, routing disabled', t13)
+        assert len(data.get('confirmed_connections', [])) == 3
+test('13. Public /api/network/status returns 4 tracks, 1 connected component, routing active', t13)
 
 # 14. Route API supports GPS snapping coordinates and returns safe unmapped notice
 def t14():
@@ -193,8 +195,9 @@ def t15():
         assert data['gaps']['total'] == 3
         assert 'entrances' in data
         assert data['entrances']['total'] >= 5
-        assert data['routing_ready'] is False
-test('15. Public /api/verification/status returns verification progress summary', t15)
+        assert data['routing_ready'] is True
+        assert data['distance']['total_meters'] == 1734.03
+test('15. Public /api/verification/status returns verification progress summary and routing readiness', t15)
 
 # 16. Admin verification endpoint strictly requires authentication
 def t16():
@@ -244,6 +247,18 @@ def t19():
         html = r.read().decode()
         assert '<div id="root">' in html
 test('19. Route Verification Interface (/admin/verify) accessible in frontend', t19)
+
+# 20. Live routing from BH4 Area to Main Gate is functional
+def t20():
+    req = urllib.request.Request('http://127.0.0.1:5173/api/route?origin_id=-2&destination_id=-1')
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        res = json.loads(r.read().decode())
+        assert res.get('available') is True
+        assert abs(res.get('distance', 0) - 1837.8) < 2.0
+        assert abs(res.get('duration', 0) - 1531) < 10
+        assert res.get('has_indoor') is True
+test('20. Live campus routing from BH4 Area to Main Gate available (1837.8m, 1531s)', t20)
 
 print('\n' + '='*70)
 print('AUTOMATED VERIFICATION TEST RESULTS')

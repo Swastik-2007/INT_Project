@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class LocationBase(BaseModel):
@@ -15,6 +15,8 @@ class LocationBase(BaseModel):
     entrance_longitude: Optional[float] = None
     centroid_latitude: Optional[float] = None
     centroid_longitude: Optional[float] = None
+    target_type: Optional[str] = "building_entrance"
+    is_surveyed_waypoint: Optional[bool] = False
 
 class LocationCreate(LocationBase):
     entrance_latitude: Optional[float] = None
@@ -32,6 +34,8 @@ class LocationUpdate(BaseModel):
     entrance_longitude: Optional[float] = None
     centroid_latitude: Optional[float] = None
     centroid_longitude: Optional[float] = None
+    target_type: Optional[str] = "building_entrance"
+    is_surveyed_waypoint: Optional[bool] = False
 
 class Location(LocationBase):
     id: int
@@ -122,3 +126,14 @@ class AuditLogResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+# ----- Confirmed Connections Schemas -----
+
+class ConnectionGeometryUpdate(BaseModel):
+    intermediate_waypoints: List[List[float]] = Field(default_factory=list, description="Ordered [[lat, lon], ...] waypoints")
+    notes: Optional[str] = None
+
+
+class ConnectionDirectConfirm(BaseModel):
+    notes: Optional[str] = "Confirmed direct walkway between recording endpoints"

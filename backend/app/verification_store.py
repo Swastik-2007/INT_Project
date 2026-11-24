@@ -84,6 +84,22 @@ def save_durable_entrance(
     return record
 
 
+def remove_durable_entrance(location_id: int) -> bool:
+    """
+    Remove an entrance registration from the durable JSON store.
+    Ensures startup hydration does not re-verify a revoked entrance.
+    """
+    ensure_verification_dir()
+    entrances = load_durable_entrances()
+    key = str(location_id)
+    if key in entrances:
+        del entrances[key]
+        with open(get_entrance_store_path(), "w", encoding="utf-8") as f:
+            json.dump(entrances, f, indent=2)
+        return True
+    return False
+
+
 def load_durable_evidence() -> List[Dict[str, Any]]:
     ensure_verification_dir()
     path = get_evidence_store_path()

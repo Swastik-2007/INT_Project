@@ -18,6 +18,7 @@ Validates:
 
 import sys
 import os
+import json
 import shutil
 import tempfile
 import hashlib
@@ -40,11 +41,77 @@ real_db_exists_before = real_db_path.exists()
 real_db_hash_before = hashlib.sha256(real_db_path.read_bytes()).hexdigest() if real_db_exists_before else None
 real_db_size_before = real_db_path.stat().st_size if real_db_exists_before else 0
 
+real_verif_dir = project_root / "data" / "verification"
+real_verif_files_before = {f.name: hashlib.sha256(f.read_bytes()).hexdigest() for f in real_verif_dir.iterdir() if f.is_file()} if real_verif_dir.exists() else {}
+
+real_conn_path = project_root / "data" / "confirmed_connections.json"
+real_conn_exists_before = real_conn_path.exists()
+real_conn_hash_before = hashlib.sha256(real_conn_path.read_bytes()).hexdigest() if real_conn_exists_before else None
+
 # Create temporary workspace for isolated test execution
 test_temp_dir = tempfile.mkdtemp(prefix="lpu_test_isolation_")
 test_db_path = Path(test_temp_dir) / "test_wayfinder.db"
 test_verification_dir = Path(test_temp_dir) / "verification"
 test_verification_dir.mkdir(parents=True, exist_ok=True)
+test_connections_file = Path(test_temp_dir) / "confirmed_connections.json"
+
+# Write isolated baseline connections (pending state for Phase 2B unverified route tests)
+baseline_conns = {
+    "version": "1.0",
+    "description": "Isolated test connections baseline",
+    "connections": [
+        {
+            "id": "conn_ab",
+            "name": "Track A to Track B Connection",
+            "from_track": "Main_gate to Admission & class area.gpx",
+            "from_node": "trk0_137",
+            "from_coords": [31.2531338, 75.7047218],
+            "to_track": "Block 30 to 32.gpx",
+            "to_node": "trk1_0",
+            "to_coords": [31.2529843, 75.7048714],
+            "straight_line_gap_m": 21.88,
+            "classification": "outdoor_walkway",
+            "is_indoor": False,
+            "status": "pending_definition",
+            "has_explicit_geometry": False,
+            "intermediate_waypoints": []
+        },
+        {
+            "id": "conn_bc",
+            "name": "Track B to Track C Connection",
+            "from_track": "Block 30 to 32.gpx",
+            "from_node": "trk1_12",
+            "from_coords": [31.2524186, 75.70508],
+            "to_track": "Block 32 to 34.gpx",
+            "to_node": "trk2_0",
+            "to_coords": [31.2523447, 75.7050889],
+            "straight_line_gap_m": 8.26,
+            "classification": "outdoor_walkway",
+            "is_indoor": False,
+            "status": "pending_definition",
+            "has_explicit_geometry": False,
+            "intermediate_waypoints": []
+        },
+        {
+            "id": "conn_cd",
+            "name": "Track C to Track D via Block 34 Indoor Corridor",
+            "from_track": "Block 32 to 34.gpx",
+            "from_node": "trk2_13",
+            "from_coords": [31.2515096, 75.7050747],
+            "to_track": "Block 34 to BH4.gpx",
+            "to_node": "trk3_0",
+            "to_coords": [31.2515297, 75.7043005],
+            "straight_line_gap_m": 73.63,
+            "classification": "indoor_corridor",
+            "is_indoor": True,
+            "status": "pending_definition",
+            "has_explicit_geometry": False,
+            "intermediate_waypoints": []
+        }
+    ]
+}
+with open(test_connections_file, "w", encoding="utf-8") as f:
+    json.dump(baseline_conns, f, indent=2)
 
 # Copy baseline database into isolated temp location so baseline locations (1..5) are present in test db
 if real_db_exists_before:
@@ -53,6 +120,7 @@ if real_db_exists_before:
 # Set environment variables BEFORE ANY application imports initialize connections
 os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path.as_posix()}"
 os.environ["VERIFICATION_DATA_DIR"] = str(test_verification_dir)
+os.environ["CONFIRMED_CONNECTIONS_FILE"] = str(test_connections_file)
 
 # Load .env safely without mutating our isolated DATABASE_URL or VERIFICATION_DATA_DIR
 _env_path = project_root / ".env"
@@ -121,6 +189,7 @@ def test_1_auth_protection():
         ("POST", "/api/admin/verification/evidence"),
         ("POST", "/api/admin/verification/review"),
         ("POST", "/api/admin/verification/entrance"),
+        ("POST", "/api/admin/verification/entrance/4/revoke"),
         ("GET", "/api/admin/verification/history"),
     ]
     for method, ep in endpoints:
@@ -295,16 +364,26 @@ def test_8_register_building_entrance():
 
 # Test 9: Unverified Route Prevention & Disconnected Components
 def test_9_unverified_route_prevention():
-    net = get_pedestrian_network()
+    net = reload_pedestrian_network()
     # Route between unverified nodes
     route = net.calculate_shortest_path("trk0_0", "trk1_0", only_verified=True)
     assert route["available"] is False, "Route must remain unavailable for unverified paths"
     assert "awaiting" in route["message"].lower() or "unrecorded" in route["message"].lower()
+    assert route.get("reason_code") == "CONNECTION_GEOMETRY_PENDING"
 
     # Disconnected components remain exactly 4
     status = net.get_network_status()
     assert status["disconnected_components_count"] == 4, f"Expected 4 components, got {status['disconnected_components_count']}"
     assert status["routing_status"]["available"] is False
+
+    # Route to unverified building entrance is blocked (Location 1 / Block 28 is unverified)
+    res_unv = client.get("/api/route?origin_id=-1&destination_id=1")
+    assert res_unv.status_code == 200
+    route_unv = res_unv.json()
+    assert route_unv["available"] is False
+    assert route_unv["reason_code"] == "DESTINATION_UNMAPPED"
+    assert route_unv["destination"]["verified"] is False
+    assert route_unv["destination"]["is_surveyed_waypoint"] is False
 
 
 # Test 10: Existing API Backward Compatibility
@@ -369,11 +448,72 @@ def test_11_real_database_untouched():
         conn.close()
         assert len(rows) == 5, f"Expected 5 locations in real database, found {len(rows)}"
 
-    # 4. Check that real data/verification directory has no stray test files
-    real_verif_dir = project_root / "data" / "verification"
+    # 4. Check that real data/verification directory was NOT mutated by tests
     if real_verif_dir.exists():
-        stray_files = [f.name for f in real_verif_dir.iterdir()]
-        assert len(stray_files) == 0, f"Real verification directory was polluted with: {stray_files}"
+        real_verif_files_after = {f.name: hashlib.sha256(f.read_bytes()).hexdigest() for f in real_verif_dir.iterdir() if f.is_file()}
+        assert real_verif_files_after == real_verif_files_before, (
+            f"Real verification directory was modified during test! Before: {real_verif_files_before}, After: {real_verif_files_after}"
+        )
+
+    # 5. Check that real data/confirmed_connections.json was NOT mutated by tests
+    if real_conn_exists_before:
+        real_conn_hash_after = hashlib.sha256(real_conn_path.read_bytes()).hexdigest()
+        assert real_conn_hash_after == real_conn_hash_before, "Real confirmed_connections.json was modified!"
+
+
+# Test 12: Connection Geometry Coordinate Validation (Regression Test for LPU_MIN_LAT)
+def test_12_connection_geometry_validation():
+    """
+    Regression test for previously fixed undefined LPU_MIN_LAT NameError:
+    Validates that:
+    1. Out-of-bounds coordinates receive HTTP 422, NEVER HTTP 500.
+    2. Malformed coordinates receive HTTP 422, NEVER HTTP 500.
+    3. Valid coordinates receive HTTP 200.
+    4. Resetting connection geometry returns HTTP 200.
+    """
+    token = make_admin_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Out-of-bounds latitude (outside campus bounds) -> HTTP 422, NOT 500
+    res_bad_lat = client.post(
+        "/api/admin/connections/conn_cd/geometry",
+        json={"intermediate_waypoints": [[35.0000, 75.704687]], "notes": "Out of bounds lat"},
+        headers=headers
+    )
+    assert res_bad_lat.status_code == 422, f"Expected HTTP 422 for out-of-bounds latitude, got {res_bad_lat.status_code}: {res_bad_lat.text}"
+    assert "outside campus boundaries" in res_bad_lat.text.lower()
+
+    # 2. Out-of-bounds longitude -> HTTP 422, NOT 500
+    res_bad_lon = client.post(
+        "/api/admin/connections/conn_cd/geometry",
+        json={"intermediate_waypoints": [[31.251520, 80.0000]], "notes": "Out of bounds lon"},
+        headers=headers
+    )
+    assert res_bad_lon.status_code == 422, f"Expected HTTP 422 for out-of-bounds longitude, got {res_bad_lon.status_code}: {res_bad_lon.text}"
+    assert "outside campus boundaries" in res_bad_lon.text.lower()
+
+    # 3. Malformed coordinate item (not [lat, lon]) -> HTTP 422, NOT 500
+    res_malformed = client.post(
+        "/api/admin/connections/conn_cd/geometry",
+        json={"intermediate_waypoints": [[31.251520]], "notes": "Malformed waypoint"},
+        headers=headers
+    )
+    assert res_malformed.status_code == 422, f"Expected HTTP 422 for malformed waypoint, got {res_malformed.status_code}"
+
+    # 4. Valid coordinates within campus boundaries -> HTTP 200
+    res_valid = client.post(
+        "/api/admin/connections/conn_cd/geometry",
+        json={"intermediate_waypoints": [[31.251520, 75.704687]], "notes": "Valid corridor waypoint"},
+        headers=headers
+    )
+    assert res_valid.status_code == 200, f"Expected HTTP 200 for valid coordinates, got {res_valid.status_code}: {res_valid.text}"
+    data = res_valid.json()
+    assert data["has_explicit_geometry"] is True
+
+    # 5. Reset connection geometry -> HTTP 200
+    res_reset = client.post("/api/admin/connections/conn_cd/reset", headers=headers)
+    assert res_reset.status_code == 200
+    assert res_reset.json()["has_explicit_geometry"] is False
 
 
 # Register tests in sequence
@@ -388,6 +528,7 @@ run_test("8. Campus Building Entrance Registration and Verification (isolated)",
 run_test("9. Unverified Route Prevention & Disconnected Component Preservation", test_9_unverified_route_prevention)
 run_test("10. Existing API Backward Compatibility (/locations, /survey-tracks, /network/status)", test_10_api_backward_compatibility)
 run_test("11. Strict Test Database & Verification Storage Isolation (SHA-256 validation)", test_11_real_database_untouched)
+run_test("12. Connection Geometry Coordinate Bounds Validation (Regression: LPU_MIN_LAT)", test_12_connection_geometry_validation)
 
 print("\n" + "=" * 70)
 print("PHASE 2B: ROUTE VERIFICATION SYSTEM TEST RESULTS")

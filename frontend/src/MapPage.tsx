@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import L from 'leaflet'
 import {
   Search,
@@ -520,6 +520,118 @@ export const MapPage: React.FC = () => {
     }
   }, [isNavigating, userPos, selectedDestination])
 
+  // Off-route detection and recalculation state
+  const [isOffRoute, setIsOffRoute] = useState(false)
+  const lastRecalcRef = useRef<number>(0)
+
+  // Draw active route on map
+  useEffect(() => {
+    if (!mapInstanceRef.current) return
+
+    if (routeLayerRef.current) {
+      mapInstanceRef.current.removeLayer(routeLayerRef.current)
+      routeLayerRef.current = null
+    }
+
+    if (!routeData || !routeData.available || !routeData.geometry || !routeData.geometry.coordinates) {
+      return
+    }
+
+    const group = L.layerGroup()
+    const allCoords = routeData.geometry.coordinates.map(c => [c[1], c[0]] as [number, number])
+
+    if (allCoords.length > 0) {
+      if (routeData.segments && routeData.segments.length > 0) {
+        for (const seg of routeData.segments) {
+          const segCoords = seg.coordinates.map(c => [c[1], c[0]] as [number, number])
+          const isIndoor = seg.is_indoor
+          const isConn = seg.type === 'manual_confirmed_connection'
+
+          const polyline = L.polyline(segCoords, {
+            color: isIndoor ? '#D97706' : (isConn ? '#0D9488' : '#2563EB'),
+            weight: isIndoor ? 6 : 5,
+            opacity: 0.9,
+            dashArray: isIndoor ? '8, 8' : undefined,
+            lineCap: 'round',
+            lineJoin: 'round'
+          })
+          polyline.bindTooltip(seg.instruction, { sticky: true })
+          group.addLayer(polyline)
+        }
+      } else {
+        const polyline = L.polyline(allCoords, {
+          color: '#2563EB',
+          weight: 5,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        })
+        group.addLayer(polyline)
+      }
+
+      // Origin Marker
+      const startIcon = L.divIcon({
+        className: 'route-start-marker',
+        html: `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10B981; border: 2.5px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.35);"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      })
+      group.addLayer(L.marker(allCoords[0], { icon: startIcon, zIndexOffset: 800 }))
+
+      // Destination Marker
+      const endIcon = L.divIcon({
+        className: 'route-end-marker',
+        html: `<div style="width: 22px; height: 22px; border-radius: 50%; background-color: #DC2626; border: 2.5px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 900;">★</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      })
+      group.addLayer(L.marker(allCoords[allCoords.length - 1], { icon: endIcon, zIndexOffset: 900 }))
+
+      group.addTo(mapInstanceRef.current)
+      routeLayerRef.current = group as any
+
+      if (!isNavigating) {
+        const bounds = L.latLngBounds(allCoords)
+        mapInstanceRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 18 })
+      }
+    }
+  }, [routeData, isNavigating])
+
+  // Off-route check during navigation
+  useEffect(() => {
+    if (!isNavigating || !userPos || !routeData?.geometry?.coordinates || !destinationId) {
+      setIsOffRoute(false)
+      return
+    }
+
+    const coords = routeData.geometry.coordinates
+    let minDist = Infinity
+    for (const pt of coords) {
+      const d = calculateDistance(userPos.lat, userPos.lon, pt[1], pt[0])
+      if (d < minDist) minDist = d
+    }
+
+    if (minDist > 35) {
+      setIsOffRoute(true)
+      const now = Date.now()
+      if (now - lastRecalcRef.current > 7000) {
+        lastRecalcRef.current = now
+        fetchWalkingRoute('gps', Number(destinationId), {
+          lat: userPos.lat,
+          lon: userPos.lon,
+          accuracy: userPos.accuracy
+        }).then(res => {
+          if (res.available) {
+            setRouteData(res)
+            setIsOffRoute(false)
+          }
+        })
+      }
+    } else {
+      setIsOffRoute(false)
+    }
+  }, [isNavigating, userPos, routeData, destinationId])
+
   // Filtered search list
   const filteredLocations = useMemo(() => {
     if (!searchQuery.trim()) return locations
@@ -657,13 +769,17 @@ export const MapPage: React.FC = () => {
                   Walking to
                 </div>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>{selectedDestination.name}</div>
-                {remainingDistance !== null && (
+                {isOffRoute ? (
+                  <div style={{ fontSize: '0.82rem', color: '#F87171', fontWeight: 800, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertTriangle size={14} /> Off Route — Recalculating...
+                  </div>
+                ) : remainingDistance !== null ? (
                   <div style={{ fontSize: '0.88rem', color: '#10B981', fontWeight: 700, marginTop: 2 }}>
                     {remainingDistance >= 1000
                       ? `${(remainingDistance / 1000).toFixed(2)} km remaining`
                       : `${remainingDistance} meters remaining`}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -1114,36 +1230,86 @@ export const MapPage: React.FC = () => {
                   }}
                 >
                   {routeData.available ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around' }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                          <Footprints size={14} /> Distance
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', marginBottom: routeData.segments ? '0.75rem' : 0 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                            <Footprints size={14} /> Distance
+                          </div>
+                          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#20252D', marginTop: 2 }}>
+                            {routeData.distance ? (routeData.distance >= 1000 ? `${(routeData.distance/1000).toFixed(2)} km` : `${Math.round(routeData.distance)} m`) : '--'}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#20252D', marginTop: 2 }}>
-                          {routeData.distance ? (routeData.distance >= 1000 ? `${(routeData.distance/1000).toFixed(2)} km` : `${Math.round(routeData.distance)} m`) : '--'}
+
+                        <div style={{ width: 1, height: 32, backgroundColor: '#E5E7EB' }} />
+
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                            <Clock size={14} /> Walking Time
+                          </div>
+                          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#E66A27', marginTop: 2 }}>
+                            {routeData.duration_text || (routeData.duration ? `~${Math.ceil(routeData.duration / 60)} min` : '--')}
+                          </div>
                         </div>
                       </div>
 
-                      <div style={{ width: 1, height: 32, backgroundColor: '#E5E7EB' }} />
+                      {/* Indoor Corridor Badge */}
+                      {routeData.has_indoor && (
+                        <div style={{ backgroundColor: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 8, padding: '4px 10px', fontSize: '0.75rem', color: '#92400E', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          🏢 Includes Ground-Floor Indoor Corridor (Block 34)
+                        </div>
+                      )}
 
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                          <Clock size={14} /> Walking Time
+                      {/* Turn-by-Turn Guidance Steps */}
+                      {routeData.segments && routeData.segments.length > 0 && (
+                        <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '0.5rem', marginTop: '0.5rem', maxHeight: 120, overflowY: 'auto' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 4 }}>
+                            Guidance Steps:
+                          </div>
+                          {routeData.segments.map((seg, idx) => (
+                            <div key={idx} style={{ fontSize: '0.78rem', color: '#374151', padding: '3px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span>{seg.is_indoor ? '🚪' : '🚶'}</span>
+                              <span style={{ fontWeight: seg.is_indoor ? 700 : 500, color: seg.is_indoor ? '#B45309' : '#1F2937' }}>{seg.instruction}</span>
+                            </div>
+                          ))}
                         </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#E66A27', marginTop: 2 }}>
-                          {routeData.duration ? `~${Math.ceil(routeData.duration / 60)} min` : '--'}
-                        </div>
-                      </div>
+                      )}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                       <Info size={18} color="#E66A27" style={{ flexShrink: 0, marginTop: 2 }} />
                       <div style={{ fontSize: '0.85rem', color: '#4B5563', lineHeight: 1.4 }}>
                         <div style={{ fontWeight: 700, color: '#20252D' }}>
-                          {routeData.message || 'Walking route not yet available. This area is awaiting mapping.'}
+                          {routeData.reason_code === 'CONNECTION_GEOMETRY_PENDING' ? (
+                            <span>Walkway Confirmed — Corridor Geometry Pending</span>
+                          ) : (
+                            routeData.message || 'Walking route not yet available.'
+                          )}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 4 }}>
-                          Pedestrian routing is strictly restricted to verified surveyed pathways. Field verification of recorded tracks is required before routing is enabled.
+                          {routeData.reason_code === 'CONNECTION_GEOMETRY_PENDING' ? (
+                            <div>
+                              <div>The surveyor confirmed this link ({routeData.connection_name}) is physically traversable, but its exact path geometry ({Math.round(routeData.straight_line_gap_m || 0)}m straight-line gap) has not yet been defined. Directions across this link remain disabled.</div>
+                              <Link
+                                to="/admin/verify"
+                                style={{
+                                  display: 'inline-block',
+                                  marginTop: 8,
+                                  padding: '4px 10px',
+                                  backgroundColor: '#E66A27',
+                                  color: '#FFFFFF',
+                                  borderRadius: 6,
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                Configure Corridor in Admin →
+                              </Link>
+                            </div>
+                          ) : (
+                            'Pedestrian routing is strictly restricted to verified surveyed pathways and explicitly confirmed connections.'
+                          )}
                         </div>
                       </div>
                     </div>
