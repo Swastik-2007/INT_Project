@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "description": "User-confirmed physical pedestrian connections between OsmAnd GPX recording interruptions.",
+  "surveyor_statement": "All four GPX tracks were physically walked. The interruptions occurred because the surveyor intentionally stopped and restarted GPS recording. Connections are confirmed physically traversable; exact walkway geometry is either defined or awaiting explicit waypoints.",
+  "connections": [
+    {
+      "id": "conn_ab",
+      "name": "Track A to Track B Connection",
+      "from_track": "Main_gate to Admission & class area.gpx",
+      "from_node": "trk0_137",
+      "from_coords": [
+        31.2531338,
+        75.7047218
+      ],
+      "to_track": "Block 30 to 32.gpx",
+      "to_node": "trk1_0",
+      "to_coords": [
+        31.2529843,
+        75.7048714
+      ],
+      "straight_line_gap_m": 21.88,
+      "classification": "outdoor_walkway",
+      "is_indoor": false,
+      "status": "geometry_defined",
+      "has_explicit_geometry": true,
+      "traversable_confirmed_by": "Original GPS Surveyor (Swastik)",
+      "confirmation_timestamp": "2026-11-24T14:54:15Z",
+      "intermediate_waypoints": [],
+      "measured_distance_m": 21.88,
+      "notes": "Confirmed direct continuous walkway link",
+      "geometry_confirmed_by": "admin",
+      "geometry_update_timestamp": "2026-11-24T14:05:20.404847Z"
+    },
+    {
+      "id": "conn_bc",
+      "name": "Track B to Track C Connection",
+      "from_track": "Block 30 to 32.gpx",
+      "from_node": "trk1_12",
+      "from_coords": [
+        31.2524186,
+        75.70508
+      ],
+      "to_track": "Block 32 to 34.gpx",
+      "to_node": "trk2_0",
+      "to_coords": [
+        31.2523447,
+        75.7050889
+      ],
+      "straight_line_gap_m": 8.26,
+      "classification": "outdoor_walkway",
+      "is_indoor": false,
+      "status": "geometry_defined",
+      "has_explicit_geometry": true,
+      "traversable_confirmed_by": "Original GPS Surveyor (Swastik)",
+      "confirmation_timestamp": "2026-11-24T14:54:15Z",
+      "intermediate_waypoints": [],
+      "measured_distance_m": 8.26,
+      "notes": "Confirmed direct continuous walkway link",
+      "geometry_confirmed_by": "admin",
+      "geometry_update_timestamp": "2026-11-24T14:00:58.457429Z"
+    },
+    {
+      "id": "conn_cd",
+      "name": "Track C to Track D via Block 34 Indoor Corridor",
+      "from_track": "Block 32 to 34.gpx",
+      "from_node": "trk2_13",
+      "from_coords": [
+        31.2515096,
+        75.7050747
+      ],
+      "to_track": "Block 34 to BH4.gpx",
+      "to_node": "trk3_0",
+      "to_coords": [
+        31.2515297,
+        75.7043005
+      ],
+      "straight_line_gap_m": 73.63,
+      "classification": "indoor_corridor",
+      "is_indoor": true,
+      "status": "geometry_defined",
+      "has_explicit_geometry": true,
+      "traversable_confirmed_by": "Original GPS Surveyor (Swastik)",
+      "confirmation_timestamp": "2026-11-24T14:54:15Z",
+      "intermediate_waypoints": [
+        [
+          31.25152,
+          75.704687
+        ]
+      ],
+      "measured_distance_m": 73.63,
+      "notes": "Surveyor-defined pathway waypoints",
+      "geometry_confirmed_by": "admin",
+      "geometry_update_timestamp": "2026-11-24T15:22:01.223482Z"
+    }
+  ]
+}

@@ -200,6 +200,24 @@ export async function verifyBuildingEntrance(token: string, payload: { location_
   }
 }
 
+export async function revokeBuildingEntrance(token: string, locationId: number): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/verification/entrance/${locationId}/revoke`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: data?.detail || 'Failed to revoke entrance verification' }
+    }
+    return { success: true, data }
+  } catch {
+    return { success: false, error: 'Cannot connect to backend server.' }
+  }
+}
+
 export async function fetchVerificationHistory(token: string, limit: number = 100): Promise<AuditLogItem[]> {
   try {
     const res = await fetch(`${BACKEND}/api/admin/verification/history?limit=${limit}`, {
@@ -220,5 +238,94 @@ export async function fetchPublicVerificationStatus(): Promise<PublicVerificatio
   } catch (err) {
     console.warn('Error fetching public verification status:', err)
     return null
+  }
+}
+
+// ----- Confirmed Connections API Calls (Phase 2B/2C Navigation) -----
+
+export async function fetchConfirmedConnections(): Promise<{ connections: any[] }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/confirmed-connections`)
+    if (!res.ok) return { connections: [] }
+    return await res.json()
+  } catch (err) {
+    console.warn('Error fetching confirmed connections:', err)
+    return { connections: [] }
+  }
+}
+
+export async function updateConnectionGeometry(
+  token: string,
+  connectionId: string,
+  waypoints: [number, number][],
+  notes?: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/connections/${connectionId}/geometry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        intermediate_waypoints: waypoints,
+        notes: notes || 'Updated corridor / pathway waypoints'
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: data?.detail || 'Failed to update connection geometry' }
+    }
+    return { success: true, data }
+  } catch {
+    return { success: false, error: 'Cannot connect to backend server.' }
+  }
+}
+
+export async function confirmDirectConnection(
+  token: string,
+  connectionId: string,
+  notes?: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/connections/${connectionId}/confirm-direct`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        notes: notes || 'Confirmed direct outdoor walkway link'
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: data?.detail || 'Failed to confirm direct connection' }
+    }
+    return { success: true, data }
+  } catch {
+    return { success: false, error: 'Cannot connect to backend server.' }
+  }
+}
+
+export async function resetConnectionGeometry(
+  token: string,
+  connectionId: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/connections/${connectionId}/reset`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { success: false, error: data?.detail || 'Failed to reset connection geometry' }
+    }
+    return { success: true, data }
+  } catch {
+    return { success: false, error: 'Cannot connect to backend server.' }
   }
 }
