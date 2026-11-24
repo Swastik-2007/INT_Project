@@ -432,6 +432,139 @@ export const MapPage: React.FC = () => {
     return locations.find(l => String(l.id) === originId) || null
   }, [locations, originId, userPos])
 
+  // Determine precise navigation status depending on backend reason_code and GPS state
+  const navStatus = useMemo(() => {
+    const isGpsOrigin = originId === 'gps'
+    const isPermissionDenied = Boolean(
+      isGpsOrigin && (gpsError?.toLowerCase().includes('permission') || gpsError?.toLowerCase().includes('denied'))
+    )
+    const isAccuracyTooLow = Boolean(
+      isGpsOrigin && (
+        (userPos && userPos.accuracy > 50.0) ||
+        (routeData?.reason_code === 'ORIGIN_NOT_SNAPPED' && routeData?.message?.toLowerCase().includes('accuracy'))
+      )
+    )
+    const isConnectionPending = Boolean(
+      routeData?.reason_code === 'CONNECTION_GEOMETRY_PENDING' ||
+      routeData?.reason_code === 'DISCONNECTED_COMPONENTS'
+    )
+    const isRouteReady = Boolean(routeData?.available)
+
+    if (isRouteReady) {
+      return {
+        badgeText: '✓ Route Ready',
+        buttonText: 'Start Walking Navigation',
+        badgeBg: '#ECFDF5',
+        badgeColor: '#065F46',
+        badgeBorder: '#A7F3D0',
+        disabled: false,
+        type: 'ready',
+        title: 'Route Ready',
+        explanation: 'Continuous pedestrian route calculated along surveyed pathways.'
+      }
+    }
+
+    if (isPermissionDenied) {
+      return {
+        badgeText: '⚠ GPS Permission Required',
+        buttonText: 'GPS Permission Required',
+        badgeBg: '#FEE2E2',
+        badgeColor: '#991B1B',
+        badgeBorder: '#FCA5A5',
+        disabled: true,
+        type: 'permission_denied',
+        title: 'GPS Permission Required',
+        explanation: 'Location permission is denied in your browser settings. Enable location access or select a fixed starting block above.'
+      }
+    }
+
+    if (isAccuracyTooLow) {
+      const accNum = Math.round(userPos?.accuracy || 0)
+      const accText = accNum > 0 ? ` (±${accNum}m)` : ''
+      return {
+        badgeText: '⚠ GPS Accuracy Too Low',
+        buttonText: `GPS Accuracy Too Low${accText}`,
+        badgeBg: '#FEF3C7',
+        badgeColor: '#92400E',
+        badgeBorder: '#FDE68A',
+        disabled: true,
+        type: 'accuracy_too_low',
+        title: 'GPS Accuracy Too Low',
+        explanation: `Your device GPS accuracy (±${accNum || 88}m) exceeds the reliable snapping threshold of 50m. Move outdoors with an open sky view or select a fixed starting block above.`
+      }
+    }
+
+    if (isConnectionPending) {
+      return {
+        badgeText: '⚠ Route Geometry Pending',
+        buttonText: 'Route Geometry Pending',
+        badgeBg: '#FFF7ED',
+        badgeColor: '#C2410C',
+        badgeBorder: '#FFEDD5',
+        disabled: true,
+        type: 'geometry_pending',
+        title: 'Route Geometry Pending',
+        explanation: routeData?.connection_name
+          ? `The surveyor confirmed this link (${routeData.connection_name}) is physically traversable, but its pathway geometry is awaiting waypoint definition in admin.`
+          : 'A connecting walkway between survey tracks is awaiting pathway geometry definition.'
+      }
+    }
+
+    if (isGpsOrigin && !userPos) {
+      return {
+        badgeText: '⚠ Acquiring GPS...',
+        buttonText: 'Acquiring GPS Location...',
+        badgeBg: '#EFF6FF',
+        badgeColor: '#1E40AF',
+        badgeBorder: '#BFDBFE',
+        disabled: true,
+        type: 'gps_acquiring',
+        title: 'Acquiring GPS Location',
+        explanation: 'Waiting for device GPS coordinates. You can also select a fixed starting block above.'
+      }
+    }
+
+    if (routeData?.reason_code === 'DESTINATION_UNMAPPED') {
+      return {
+        badgeText: '⚠ Destination Unmapped',
+        buttonText: 'Destination Unmapped',
+        badgeBg: '#F3F4F6',
+        badgeColor: '#374151',
+        badgeBorder: '#E5E7EB',
+        disabled: true,
+        type: 'unmapped',
+        title: 'Destination Awaiting Verification',
+        explanation: `${selectedDestination?.name || 'Destination'} does not yet have a verified entrance mapped on the pedestrian network.`
+      }
+    }
+
+    if (routeData?.reason_code === 'ORIGIN_UNMAPPED') {
+      return {
+        badgeText: '⚠ Origin Unmapped',
+        buttonText: 'Origin Unmapped',
+        badgeBg: '#F3F4F6',
+        badgeColor: '#374151',
+        badgeBorder: '#E5E7EB',
+        disabled: true,
+        type: 'unmapped',
+        title: 'Origin Awaiting Verification',
+        explanation: 'Selected starting location is awaiting verified entrance coordinates.'
+      }
+    }
+
+    return {
+      badgeText: selectedDestination?.is_surveyed_waypoint ? 'Surveyed Waypoint' : (selectedDestination?.verified ? '✓ Verified Doorway' : '⚠ Unverified Doorway'),
+      buttonText: 'Route Unavailable',
+      badgeBg: '#F3F4F6',
+      badgeColor: '#374151',
+      badgeBorder: '#E5E7EB',
+      disabled: true,
+      type: 'unavailable',
+      title: 'Route Unavailable',
+      explanation: routeData?.message || 'Walking route not yet available between selected points.'
+    }
+  }, [originId, gpsError, userPos, routeData, selectedDestination])
+
   // Handle Route Calculation when Origin or Destination changes
   useEffect(() => {
     if (!destinationId) {
@@ -471,7 +604,10 @@ export const MapPage: React.FC = () => {
             setLoadingRoute(false)
             setRouteData({
               available: false,
-              message: 'Walking route not yet available. This area is awaiting mapping.',
+              reason_code: userPos && userPos.accuracy > 50.0 ? 'ORIGIN_NOT_SNAPPED' : 'NETWORK_ERROR',
+              message: userPos && userPos.accuracy > 50.0
+                ? `GPS accuracy (±${Math.round(userPos.accuracy)}m) is too poor for reliable snapping (threshold: 50m).`
+                : 'Walking route not yet available at this time.',
               origin: { id: -1, name: 'Current Location', verified: true },
               destination: {
                 id: Number(destinationId),
@@ -486,6 +622,7 @@ export const MapPage: React.FC = () => {
         setRemainingDistance(null)
         setRouteData({
           available: false,
+          reason_code: 'GPS_NOT_ACQUIRED',
           message: 'Walking route not yet available. GPS location not acquired.',
           origin: { id: -1, name: 'Current Location', verified: false },
           destination: {
@@ -1159,14 +1296,15 @@ export const MapPage: React.FC = () => {
                 <span
                   style={{
                     fontSize: '0.72rem',
-                    backgroundColor: '#ECFDF5',
-                    color: '#065F46',
+                    backgroundColor: userPos.accuracy <= 50 ? '#ECFDF5' : '#FEF3C7',
+                    color: userPos.accuracy <= 50 ? '#065F46' : '#92400E',
                     padding: '2px 8px',
                     borderRadius: 999,
-                    fontWeight: 600
+                    fontWeight: 600,
+                    border: `1px solid ${userPos.accuracy <= 50 ? '#A7F3D0' : '#FDE68A'}`
                   }}
                 >
-                  GPS ±{Math.round(userPos.accuracy)}m
+                  GPS ±{Math.round(userPos.accuracy)}m{userPos.accuracy > 50 ? ' (Low Accuracy)' : ''}
                 </span>
               )}
             </div>
@@ -1194,12 +1332,12 @@ export const MapPage: React.FC = () => {
                     fontWeight: 700,
                     padding: '4px 10px',
                     borderRadius: 999,
-                    backgroundColor: selectedDestination.verified ? '#ECFDF5' : '#FFFBEB',
-                    color: selectedDestination.verified ? '#065F46' : '#B45309',
-                    border: `1px solid ${selectedDestination.verified ? '#A7F3D0' : '#FDE68A'}`
+                    backgroundColor: navStatus.badgeBg,
+                    color: navStatus.badgeColor,
+                    border: `1px solid ${navStatus.badgeBorder}`
                   }}
                 >
-                  {selectedDestination.verified ? '✓ Verified' : '⚠ Survey Pending'}
+                  {navStatus.badgeText}
                 </span>
               </div>
 
@@ -1280,16 +1418,12 @@ export const MapPage: React.FC = () => {
                       <Info size={18} color="#E66A27" style={{ flexShrink: 0, marginTop: 2 }} />
                       <div style={{ fontSize: '0.85rem', color: '#4B5563', lineHeight: 1.4 }}>
                         <div style={{ fontWeight: 700, color: '#20252D' }}>
-                          {routeData.reason_code === 'CONNECTION_GEOMETRY_PENDING' ? (
-                            <span>Walkway Confirmed — Corridor Geometry Pending</span>
-                          ) : (
-                            routeData.message || 'Walking route not yet available.'
-                          )}
+                          {navStatus.title}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 4 }}>
-                          {routeData.reason_code === 'CONNECTION_GEOMETRY_PENDING' ? (
+                          <div>{navStatus.explanation}</div>
+                          {routeData?.reason_code === 'CONNECTION_GEOMETRY_PENDING' && (
                             <div>
-                              <div>The surveyor confirmed this link ({routeData.connection_name}) is physically traversable, but its exact path geometry ({Math.round(routeData.straight_line_gap_m || 0)}m straight-line gap) has not yet been defined. Directions across this link remain disabled.</div>
                               <Link
                                 to="/admin/verify"
                                 style={{
@@ -1307,8 +1441,6 @@ export const MapPage: React.FC = () => {
                                 Configure Corridor in Admin →
                               </Link>
                             </div>
-                          ) : (
-                            'Pedestrian routing is strictly restricted to verified surveyed pathways and explicitly confirmed connections.'
                           )}
                         </div>
                       </div>
@@ -1321,16 +1453,16 @@ export const MapPage: React.FC = () => {
               <div style={{ display: 'flex', gap: 10 }}>
                 {!isNavigating ? (
                   <button
-                    disabled={!routeData?.available}
+                    disabled={navStatus.disabled}
                     onClick={() => {
-                      if (routeData?.available) {
+                      if (!navStatus.disabled && routeData?.available) {
                         setIsNavigating(true)
                         setIsSheetExpanded(false)
                       }
                     }}
                     style={{
                       flex: 1,
-                      backgroundColor: routeData?.available ? '#E66A27' : '#9CA3AF',
+                      backgroundColor: !navStatus.disabled ? '#E66A27' : '#9CA3AF',
                       color: '#FFFFFF',
                       padding: '0.85rem',
                       borderRadius: 12,
@@ -1340,13 +1472,13 @@ export const MapPage: React.FC = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 8,
-                      cursor: routeData?.available ? 'pointer' : 'not-allowed',
-                      boxShadow: routeData?.available ? '0 4px 14px rgba(230, 106, 39, 0.35)' : 'none',
+                      cursor: !navStatus.disabled ? 'pointer' : 'not-allowed',
+                      boxShadow: !navStatus.disabled ? '0 4px 14px rgba(230, 106, 39, 0.35)' : 'none',
                       border: 'none'
                     }}
                   >
                     <Navigation size={18} />
-                    {routeData?.available ? 'Start Walking Navigation' : 'Route Awaiting Survey'}
+                    {navStatus.buttonText}
                   </button>
                 ) : (
                   <button
@@ -1579,12 +1711,12 @@ export const MapPage: React.FC = () => {
                           fontSize: '0.72rem',
                           padding: '3px 8px',
                           borderRadius: 999,
-                          backgroundColor: loc.verified ? '#ECFDF5' : '#F3F4F6',
-                          color: loc.verified ? '#065F46' : '#6B7280',
+                          backgroundColor: loc.is_surveyed_waypoint ? '#EEF2FF' : (loc.verified ? '#ECFDF5' : '#F3F4F6'),
+                          color: loc.is_surveyed_waypoint ? '#4F46E5' : (loc.verified ? '#065F46' : '#6B7280'),
                           fontWeight: 600
                         }}
                       >
-                        {loc.verified ? 'Verified' : 'Survey Pending'}
+                        {loc.is_surveyed_waypoint ? 'Surveyed Waypoint' : (loc.verified ? 'Verified Entrance' : 'Unverified Doorway')}
                       </span>
                       <ArrowRight size={16} color="#9CA3AF" />
                     </div>
