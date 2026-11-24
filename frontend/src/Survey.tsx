@@ -192,9 +192,12 @@ export default function Survey() {
 
   return (
     <div style={{ fontFamily: 'var(--font-main, sans-serif)', maxWidth: 480, margin: '0 auto', padding: '1.25rem' }}>
-      <div style={{ marginBottom: '1rem' }}>
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <a href="/" style={{ color: '#E66A27', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>
           ← Back to Campus Navigation
+        </a>
+        <a href="/admin/verify" style={{ color: '#065F46', backgroundColor: '#ECFDF5', padding: '4px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 700, border: '1px solid #A7F3D0' }}>
+          🛡️ Route Verification System →
         </a>
       </div>
       <h2 style={{ color: '#E66A27', margin: '0 0 0.35rem', fontWeight: 800 }}>📍 LPU GPS Survey Tool</h2>

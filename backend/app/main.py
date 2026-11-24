@@ -13,6 +13,17 @@ async def startup_event():
     # The importer is idempotent and never changes existing location rows.
     from scripts.seed_locations import seed_data
     seed_data()
+    # Hydrate durable verification records (Phase 2B persistent storage strategy)
+    try:
+        from .db import SessionLocal
+        from .verification_store import hydrate_database
+        db_session = SessionLocal()
+        try:
+            hydrate_database(db_session)
+        finally:
+            db_session.close()
+    except Exception as e:
+        print(f"Verification store hydration note: {e}")
 
 # The frontend uses bearer tokens and relative API routes in development.
 app.add_middleware(

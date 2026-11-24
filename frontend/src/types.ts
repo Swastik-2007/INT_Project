@@ -82,3 +82,90 @@ export interface NetworkStatusResponse {
     unverified_coverage_meters: number
   }
 }
+
+// ----- Phase 2B Verification Types -----
+
+export interface VerificationEvidenceItem {
+  id: number
+  observer_name: string
+  status: 'pending' | 'approved' | 'rejected'
+  notes: string
+  surface_type?: string | null
+  submitted_at: string
+  reviewed_by?: string | null
+  review_notes?: string | null
+}
+
+export interface VerificationTrackItem {
+  target_id: string
+  track_index: number
+  name: string
+  segment_label: string
+  point_count: number
+  distance_m: number
+  verified: boolean
+  start_coords?: { lat: number; lon: number }
+  end_coords?: { lat: number; lon: number }
+  evidence: VerificationEvidenceItem[]
+}
+
+export interface VerificationGapItem {
+  target_id: string
+  gap_index: number
+  from_recording: string
+  to_recording: string
+  displacement_meters: number
+  is_indoor_corridor: boolean
+  status: string
+  verified: boolean
+  from_endpoint?: { lat: number; lon: number }
+  to_startpoint?: { lat: number; lon: number }
+  evidence: VerificationEvidenceItem[]
+}
+
+export interface VerificationPendingData {
+  tracks: VerificationTrackItem[]
+  gaps: VerificationGapItem[]
+  locations: CampusLocation[]
+  pending_evidence_count: number
+  total_tracks_count: number
+  verified_tracks_count: number
+  total_locations_count: number
+  verified_locations_count: number
+}
+
+export interface AuditLogItem {
+  id: number
+  action: string
+  admin_username: string
+  target_type: string
+  target_id: string
+  details: Record<string, any>
+  created_at: string
+}
+
+export interface PublicVerificationStatus {
+  tracks: {
+    total: number
+    verified: number
+    unverified: number
+    percent_verified: number
+  }
+  gaps: {
+    total: number
+    resolved: number
+    pending: number
+  }
+  entrances: {
+    total: number
+    verified: number
+    unverified: number
+    percent_verified: number
+  }
+  distance: {
+    total_meters: number
+    verified_meters: number
+    unverified_meters: number
+  }
+  routing_ready: boolean
+}

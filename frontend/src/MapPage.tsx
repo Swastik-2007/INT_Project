@@ -20,8 +20,8 @@ import {
   Layers
 } from 'lucide-react'
 import { Navbar } from './Navbar'
-import { fetchLocations, fetchWalkingRoute, fetchSurveyTracks, fetchNetworkStatus } from './api'
-import type { CampusLocation, RouteResponse, UserPosition, NetworkStatusResponse } from './types'
+import { fetchLocations, fetchWalkingRoute, fetchSurveyTracks, fetchNetworkStatus, fetchPublicVerificationStatus } from './api'
+import type { CampusLocation, RouteResponse, UserPosition, NetworkStatusResponse, PublicVerificationStatus } from './types'
 import type { SurveyTracksGeoJSON } from './api'
 
 // LPU Campus Approximate Center (Phagwara, Punjab)
@@ -83,6 +83,7 @@ export const MapPage: React.FC = () => {
   const [networkStatus, setNetworkStatus] = useState<NetworkStatusResponse | null>(null)
   const [loadingNetworkStatus, setLoadingNetworkStatus] = useState(false)
   const [networkStatusError, setNetworkStatusError] = useState<string | null>(null)
+  const [verificationProgress, setVerificationProgress] = useState<PublicVerificationStatus | null>(null)
 
   // Leaflet Map Refs
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -126,6 +127,10 @@ export const MapPage: React.FC = () => {
         setNetworkStatusError('Unable to load survey network status')
         setLoadingNetworkStatus(false)
       })
+    // Load public verification progress
+    fetchPublicVerificationStatus().then(vp => {
+      if (vp) setVerificationProgress(vp)
+    })
   }, [searchParams])
 
   // Initialize Leaflet Map
@@ -333,11 +338,12 @@ export const MapPage: React.FC = () => {
         // Track polyline
         const coords = (feature.geometry.coordinates as number[][]).map(c => [c[1], c[0]] as [number, number])
         const color = feature.properties.stroke || feature.properties.color || '#E66A27'
+        const isVerified = Boolean(feature.properties.verified)
         const polyline = L.polyline(coords, {
-          color,
+          color: isVerified ? '#10B981' : color,
           weight: 4,
           opacity: 0.85,
-          dashArray: '8, 6',  // Dashed to indicate "unverified survey data"
+          dashArray: isVerified ? undefined : '8, 6',  // Dashed if unverified, solid if verified
           lineCap: 'round',
           lineJoin: 'round',
         })
@@ -358,8 +364,8 @@ export const MapPage: React.FC = () => {
               <div>Source: <strong>OsmAnd GPX Recording</strong></div>
             </div>
             <div style="margin-top: 6px; padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 700;
-              background-color: #FFFBEB; color: #B45309; display: inline-block;">
-              ⚠ Unverified Survey Track
+              background-color: ${isVerified ? '#ECFDF5' : '#FFFBEB'}; color: ${isVerified ? '#065F46' : '#B45309'}; display: inline-block;">
+              ${isVerified ? '✓ Verified Pathway' : '⚠ Unverified Survey Track'}
             </div>
           </div>
         `)
@@ -828,6 +834,28 @@ export const MapPage: React.FC = () => {
                     <div style={{ fontWeight: 800, color: '#B45309', fontSize: '0.82rem' }}>
                       {networkStatus?.disconnected_components_count || 4} Disconn.
                     </div>
+                  </div>
+                </div>
+
+                {/* Verification Progress */}
+                <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', padding: '6px 8px', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#166534', marginBottom: 3 }}>
+                    <span>Route Verification Progress</span>
+                    <span>{verificationProgress ? `${verificationProgress.tracks.verified}/${verificationProgress.tracks.total} Tracks (${verificationProgress.tracks.percent_verified}%)` : '0/4 (0%)'}</span>
+                  </div>
+                  <div style={{ width: '100%', height: 4, backgroundColor: '#DCFCE7', borderRadius: 2, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${verificationProgress?.tracks.percent_verified || 0}%`,
+                        height: '100%',
+                        backgroundColor: '#10B981',
+                        transition: 'width 0.3s'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#15803D', marginTop: 3 }}>
+                    <span>Entrances: {verificationProgress ? `${verificationProgress.entrances.verified}/${verificationProgress.entrances.total}` : '0/5'}</span>
+                    <span>Gaps: {verificationProgress ? `${verificationProgress.gaps.resolved}/${verificationProgress.gaps.total}` : '0/3'}</span>
                   </div>
                 </div>
 
